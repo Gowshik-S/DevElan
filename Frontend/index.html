@@ -755,11 +755,17 @@
     </footer>
 
     <script>
-        const API_ROOTS = [
-            'http://127.0.0.1:8000/api/v1',
-            'http://localhost:8000/api/v1',
-        ];
-        let activeApiRoot = localStorage.getItem('devela-api-root') || API_ROOTS[0];
+        const API_ROOTS = (() => {
+            const candidates = [];
+            if (window.location && window.location.origin && window.location.origin !== 'null') {
+                candidates.push(`${window.location.origin}/api/v1`);
+            }
+            candidates.push('http://127.0.0.1:8000/api/v1');
+            candidates.push('http://localhost:8000/api/v1');
+            return candidates;
+        })();
+        const storedApiRoot = localStorage.getItem('devela-api-root');
+        let activeApiRoot = storedApiRoot && API_ROOTS.includes(storedApiRoot) ? storedApiRoot : API_ROOTS[0];
         const AUTH_TOKEN_KEY = 'devela-access-token';
         const AUTH_ROLE_KEY = 'devela-user-role';
         const AUTH_USER_ID_KEY = 'devela-user-id';
