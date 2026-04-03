@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DevÉlan - Student</title>
+    <style>
+        :root {
+            --primary-night-blue: #1e3a8a; 
+            --accent-blue: #3b82f6;
+            --primary-cyan: #00d4ff; 
+            --soft-white: #f5ede0;
+            --deep-black: #161311;
+            --muted-blue: #546877;
+            --bg-grey: #e2e8f0; 
+            --pure-white: #ffffff;
+            --transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', -apple-system, system-ui, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-grey);
+            background-image: 
+                linear-gradient(rgba(0, 212, 255, 0.15) 1.5px, transparent 1.5px),
+                linear-gradient(90deg, rgba(0, 212, 255, 0.15) 1.5px, transparent 1.5px);
+            background-size: 40px 40px;
+            color: var(--deep-black);
+            line-height: 1.4;
+            min-height: 100vh;
+            overflow-x: hidden;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* --- Header - Synced with Profile Page --- */
+        header {
+            width: 100%;
+            padding: 1.5rem 5%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 1000;
+            background: transparent;
+        }
+
+        .logo {
+            font-size: 1.8rem;
+            font-weight: 900;
+            letter-spacing: -1px;
+            color: var(--deep-black);
+            cursor: pointer;
+            pointer-events: auto;
+        }
+
+        .logo span {
+            color: var(--primary-night-blue);
+        }
+
+        .nav-wrapper {
+            display: flex;
+            gap: 1rem;
+            pointer-events: auto;
+        }
+
+        .theme-toggle {
+            width: 40px;
+            height: 40px;
+            border-radius: 999px;
+            border: 1px solid rgba(255, 255, 255, 0.6);
+            background: rgba(255, 255, 255, 0.45);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--deep-black);
+            cursor: pointer;
+            transition: var(--transition);
+            box-shadow: 0 10px 30px rgba(30, 58, 138, 0.1);
+        }
+
+        .theme-toggle:hover {
+            transform: translateY(-2px);
+            border-color: rgba(30, 58, 138, 0.4);
+        }
+
+        .theme-toggle svg {
+            width: 16px;
+            height: 16px;
+            stroke: currentColor;
+            fill: none;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        .theme-toggle .icon-sun { display: none; }
+        [data-theme="dark"] .theme-toggle .icon-sun { display: block; }
+        [data-theme="dark"] .theme-toggle .icon-moon { display: none; }
+
+        nav {
+            background: rgba(255, 255, 255, 0.35); 
+            backdrop-filter: blur(8px); 
+            -webkit-backdrop-filter: blur(8px);
+            padding: 0.4rem;
+            border-radius: 100px;
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            display: flex;
+            gap: 0.2rem;
+            box-shadow: 0 10px 30px rgba(30, 58, 138, 0.1);
+        }
+
+        nav a {
+            text-decoration: none;
+            color: var(--deep-black);
+            font-weight: 700;
+            font-size: 0.8rem;
+            padding: 0.5rem 1.2rem;
+            border-radius: 50px;
+            transition: var(--transition);
+        }
+
+        nav a:hover:not(.locked) {
+            color: var(--primary-night-blue);
+        }
+
+        nav a.active {
+            background: var(--primary-night-blue);
+            color: white;
+            box-shadow: 0 4px 15px rgba(30, 58, 138, 0.3);
+        }
+
+        nav a.logout {
+            color: #ef4444;
+        }
+
+        nav a.logout:hover {
+            background: rgba(239, 68, 68, 0.1);
+        }
+
+        nav a.locked {
+            opacity: 0.55;
+            cursor: not-allowed;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .nav-icon {
+            width: 12px;
+            height: 12px;
+            stroke: currentColor;
+            fill: none;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        /* --- Grid Layout --- */
+        main {
+            flex: 1;
+            padding: 0 3% 2rem;
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 1.5rem;
+            align-items: stretch;
+        }
+
+        .column {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            height: 100%;
+            min-height: 0; /* Important for flex child in grid */
+        }
+
+        .problem-section { animation: slideInLeft 0.8s ease-out; }
+        .action-section { animation: slideInUp 0.8s ease-out; }
+        .submission-section { animation: slideInRight 0.8s ease-out; }
+
+        .card {
+            background: var(--pure-white);
+            border-radius: 20px;
+            padding: 1.5rem;
+            box-shadow: 0 10px 30px -12px rgba(0, 0, 0, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .el-tag {
+            background: var(--deep-black);
+            color: var(--pure-white);
+            padding: 0.3rem 0.6rem;
+            border-radius: 6px;
+            font-weight: 800;
+            font-size: 0.7rem;
+            margin-bottom: 0.8rem;
+            display: inline-block;
+            width: fit-content;
+        }
+
+        .case-title {
+            font-size: 1.6rem;
+            font-weight: 900;
+            line-height: 1.1;
+            margin-bottom: 1rem;
+        }
+
+        .section-subtitle {
+            font-size: 0.6rem;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--muted-blue);
+            margin-bottom: 0.5rem;
+            font-weight: 800;
+        }
+
+        .description {
+            font-size: 0.85rem;
+            margin-bottom: 1rem;
+            padding: 1rem;
+            background: var(--soft-white);
+            border-radius: 12px;
+            border-left: 4px solid var(--primary-night-blue);
+        }
+
+        .tag-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.4rem;
+            margin-bottom: 1rem;
+        }
+
+        .tag {
+            background: white;
+            border: 1px solid var(--bg-grey);
+            padding: 0.3rem 0.6rem;
+            border-radius: 8px;
+            font-size: 0.7rem;
+            font-weight: 700;
+        }
+
+        .output-highlight {
+            margin-top: auto;
+            padding: 1rem;
+            background: var(--deep-black);
+            color: var(--soft-white);
+            border-radius: 12px;
+            font-size: 0.8rem;
+        }
+
+        .output-highlight span { color: var(--primary-cyan); font-weight: 800; }
+
+        .instruction-item {
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
+            margin-bottom: 0.4rem;
+            padding: 0.65rem;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.5);
+            transition: var(--transition);
+            border: 1px solid transparent;
+        }
+
+        /* Workflow Hover Animation */
+        .instruction-item:hover {
+            background: var(--pure-white);
+            transform: translateX(10px) scale(1.01);
+            border-color: rgba(30, 58, 138, 0.1);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.05);
+            cursor: default;
+        }
+
+        .instruction-item p { font-size: 0.78rem; font-weight: 500; }
+        
+        .arrow { 
+            color: var(--primary-night-blue); 
+            font-weight: 900; 
+            transition: transform 0.3s ease;
+            display: flex;
+            align-items: center;
+        }
+
+        .arrow svg {
+            width: 14px;
+            height: 14px;
+            stroke: currentColor;
+            fill: none;
+            stroke-width: 2.2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        .instruction-item:hover .arrow {
+            transform: scale(1.3);
+        }
+
+        .submission-card {
+            background: var(--pure-white);
+            border-radius: 20px;
+            padding: 1.2rem;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+            display: flex;
+            flex-direction: column;
+            gap: 0.8rem;
+            position: relative;
+            overflow: hidden;
+            flex: 1;
+        }
+
+        .input-group label { font-weight: 800; font-size: 0.65rem; color: var(--muted-blue); text-transform: uppercase; }
+        input[type="text"] { padding: 0.8rem; border-radius: 10px; border: 2px solid var(--bg-grey); outline: none; font-size: 0.85rem; width: 100%; }
+        
+        .upload-box {
+            flex: 1;
+            border: 2px dashed var(--muted-blue);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            background: var(--bg-grey);
+        }
+
+        .upload-box span { font-weight: 700; color: var(--muted-blue); font-size: 0.75rem; }
+        .upload-box input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+
+        .btn-submit {
+            background: var(--deep-black);
+            color: white;
+            padding: 0.8rem;
+            border: none;
+            border-radius: 10px;
+            font-weight: 800;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .btn-submit:hover { background: var(--primary-night-blue); }
+
+        .submitted-overlay {
+            position: absolute;
+            inset: 0;
+            background: var(--pure-white);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 5;
+            animation: fadeIn 0.4s ease forwards;
+        }
+
+        .checkmark-icon { width: 35px; height: 35px; background: #e7f7ed; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 0.5rem; animation: bounceIn 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        .checkmark-icon svg { width: 18px; height: 18px; stroke: #1e7e34; fill: none; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+        .submitted-text { color: #1e7e34; font-weight: 800; font-size: 0.8rem; }
+
+        [data-theme="dark"] {
+            --dark-bg: #0d1110;
+            --dark-surface: #18201e;
+            --dark-surface-2: #24302d;
+            --dark-text: #f3f6f2;
+            --dark-muted: #b7c2bb;
+            --dark-accent: #2ec4b6;
+            --dark-highlight: #9fe870;
+            --dark-premium: #c9883d;
+            --primary-night-blue: var(--dark-accent);
+            --accent-blue: var(--dark-accent);
+            --primary-cyan: var(--dark-highlight);
+        }
+
+        [data-theme="dark"] body {
+            background-color: var(--dark-bg);
+            color: var(--dark-text);
+            background-image:
+                linear-gradient(rgba(46, 196, 182, 0.11) 1.5px, transparent 1.5px),
+                linear-gradient(90deg, rgba(201, 136, 61, 0.08) 1.5px, transparent 1.5px);
+        }
+
+        [data-theme="dark"] .logo,
+        [data-theme="dark"] nav a,
+        [data-theme="dark"] .case-title,
+        [data-theme="dark"] .description,
+        [data-theme="dark"] .tag,
+        [data-theme="dark"] .instruction-item p,
+        [data-theme="dark"] .submission-card,
+        [data-theme="dark"] input[type="text"],
+        [data-theme="dark"] .input-group label,
+        [data-theme="dark"] .section-subtitle,
+        [data-theme="dark"] .upload-box span {
+            color: var(--dark-text);
+        }
+
+        [data-theme="dark"] .logo span {
+            color: var(--dark-accent);
+        }
+
+        [data-theme="dark"] nav {
+            background: rgba(22, 24, 32, 0.88);
+            border-color: rgba(46, 196, 182, 0.35);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+        }
+
+        [data-theme="dark"] nav a:hover:not(.locked) {
+            color: var(--dark-accent);
+        }
+
+        [data-theme="dark"] nav a.active {
+            background: var(--dark-accent);
+            color: #072824;
+            box-shadow: 0 4px 15px rgba(46, 196, 182, 0.32);
+        }
+
+        [data-theme="dark"] .theme-toggle {
+            background: rgba(22, 24, 32, 0.94);
+            border-color: rgba(46, 196, 182, 0.35);
+            color: var(--dark-text);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+        }
+
+        [data-theme="dark"] .theme-toggle:hover {
+            border-color: var(--dark-premium);
+            background: rgba(201, 136, 61, 0.2);
+        }
+
+        [data-theme="dark"] .card,
+        [data-theme="dark"] .submission-card {
+            background: rgba(26, 29, 38, 0.92);
+            border-color: rgba(46, 196, 182, 0.22);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
+        }
+
+        [data-theme="dark"] .description {
+            background: #141824;
+            border-left-color: var(--dark-premium);
+        }
+
+        [data-theme="dark"] .tag {
+            background: #141824;
+            border-color: #30384a;
+        }
+
+        [data-theme="dark"] .output-highlight {
+            background: #151925;
+            color: #dfd5c7;
+        }
+
+        [data-theme="dark"] .output-highlight span {
+            color: var(--dark-highlight);
+        }
+
+        [data-theme="dark"] .instruction-item {
+            background: rgba(46, 196, 182, 0.08);
+        }
+
+        [data-theme="dark"] .instruction-item:hover {
+            background: rgba(46, 196, 182, 0.14);
+            border-color: rgba(46, 196, 182, 0.3);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.55);
+        }
+
+        [data-theme="dark"] .arrow {
+            color: var(--dark-premium);
+        }
+
+        [data-theme="dark"] input[type="text"] {
+            background: #12151e;
+            border-color: #2f3645;
+        }
+
+        [data-theme="dark"] input[type="text"]::placeholder {
+            color: #8f8372;
+        }
+
+        [data-theme="dark"] .upload-box {
+            background: var(--dark-surface-2);
+            border-color: rgba(46, 196, 182, 0.35);
+        }
+
+        [data-theme="dark"] .btn-submit {
+            background: var(--dark-accent);
+            color: #072824;
+        }
+
+        [data-theme="dark"] .btn-submit:hover {
+            background: #26aea1;
+            color: #072824;
+        }
+
+        [data-theme="dark"] .submitted-overlay {
+            background: rgba(26, 29, 38, 0.95);
+        }
+
+        [data-theme="dark"] .checkmark-icon {
+            background: rgba(159, 232, 112, 0.2);
+        }
+
+        [data-theme="dark"] .checkmark-icon svg,
+        [data-theme="dark"] .submitted-text {
+            stroke: var(--dark-highlight);
+            color: var(--dark-highlight);
+        }
+
+        @keyframes slideInLeft { from { opacity: 0; transform: translateX(-30px); } to { opacity: 1; transform: translateX(0); } }
+        @keyframes slideInRight { from { opacity: 0; transform: translateX(30px); } to { opacity: 1; transform: translateX(0); } }
+        @keyframes slideInUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes bounceIn { 0% { transform: scale(0.3); opacity: 0; } 50% { transform: scale(1.05); opacity: 1; } 100% { transform: scale(1); } }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo" onclick="window.location.href='index.html'">Dev<span>Élan.</span></div>
+        <div class="nav-wrapper">
+            <nav>
+                <a href="user_home.html" class="active">Home</a>
+                <a href="#" class="locked">Leaderboard
+                    <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <rect x="4" y="11" width="16" height="10" rx="2"></rect>
+                        <path d="M8 11V8a4 4 0 1 1 8 0v3"></path>
+                    </svg>
+                </a>
+                <a href="user_profile.html">Profile</a>
+            </nav>
+            <nav>
+                <a href="#" class="logout" id="logoutLink">Logout</a>
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        <!-- Column 1: Problem Statement -->
+        <div class="column problem-section">
+            <span class="section-subtitle">01 / Challenge</span>
+            <div class="card">
+                <div class="el-tag" id="useCaseCode">--</div>
+                <h1 class="case-title" id="useCaseTitle">No Task Assigned</h1>
+                <span class="section-subtitle">The Objective</span>
+                <p class="description" id="useCaseDescription">No task assigned yet. Stay ready — your next challenge is coming.</p>
+                <span class="section-subtitle">Key Concepts</span>
+                <div class="tag-container" id="useCaseTags">
+                    <div class="tag">Awaiting Assignment</div>
+                </div>
+                <div class="output-highlight" id="useCaseOutput"><span>Output:</span> Assignment pending.</div>
+            </div>
+        </div>
+
+        <!-- Column 2: Workflow -->
+        <div class="column action-section">
+            <span class="section-subtitle">02 / Workflow</span>
+            <div class="card" style="background: transparent; box-shadow: none; border: none; padding: 0;" id="workflowList">
+                <div class="instruction-item"><span class="arrow"><svg viewBox="0 0 24 24" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg></span><p>No task assigned yet. Stay ready — your next challenge is coming.</p></div>
+            </div>
+        </div>
+
+        <!-- Column 3: Submission -->
+        <div class="column submission-section">
+            <span class="section-subtitle">03 / Delivery</span>
+            <div class="submission-card" id="repoCard">
+                <div class="input-group"><label>Git Link</label><input type="text" id="gitUrl" placeholder="https://github.com/..." required></div>
+                <button class="btn-submit" id="repoSubmitBtn" onclick="submitRepo()">submit</button>
+                <p id="repoMessage" style="font-size:0.75rem;font-weight:700;color:var(--muted-blue);"></p>
+                <div class="submitted-overlay" id="repoSuccess"><div class="checkmark-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg></div><div class="submitted-text">Linked</div></div>
+            </div>
+            <div class="submission-card" id="videoCard">
+                <div class="input-group" style="flex: 1; display: flex; flex-direction: column;"><label>Demo Recording</label><div class="upload-box"><span id="fileText">Select Recording</span><input type="file" id="videoUpload" title="Select demo recording" accept="video/*" onchange="updateFileName()"></div></div>
+                <button class="btn-submit" id="videoSubmitBtn" onclick="submitVideo()">Upload</button>
+                <p id="videoMessage" style="font-size:0.75rem;font-weight:700;color:var(--muted-blue);"></p>
+                <div class="submitted-overlay" id="videoSuccess"><div class="checkmark-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg></div><div class="submitted-text">Uploaded</div></div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const logoutLink = document.getElementById('logoutLink');
+        const API_ROOTS = [
+            'http://127.0.0.1:8000/api/v1',
+            'http://localhost:8000/api/v1',
+        ];
+        let activeApiRoot = localStorage.getItem('devela-api-root') || API_ROOTS[0];
+        const AUTH_TOKEN_KEY = 'devela-access-token';
+        const AUTH_ROLE_KEY = 'devela-user-role';
+        const AUTH_USER_ID_KEY = 'devela-user-id';
+        let activeUseCaseId = null;
+
+        function getApiRoots() {
+            const merged = [activeApiRoot, ...API_ROOTS];
+            return merged.filter((value, index) => value && merged.indexOf(value) === index);
+        }
+
+        async function fetchWithFallback(path, options) {
+            let lastError = null;
+            const candidates = getApiRoots();
+
+            for (const candidate of candidates) {
+                try {
+                    const response = await fetch(`${candidate}${path}`, options);
+                    activeApiRoot = candidate;
+                    localStorage.setItem('devela-api-root', candidate);
+                    return response;
+                } catch (error) {
+                    lastError = error;
+                }
+            }
+
+            throw new Error(
+                `Unable to reach backend at ${candidates.join(' or ')}. Ensure the FastAPI server is running.`
+            );
+        }
+
+        function getToken() {
+            return localStorage.getItem(AUTH_TOKEN_KEY);
+        }
+
+        function clearSession() {
+            localStorage.removeItem(AUTH_TOKEN_KEY);
+            localStorage.removeItem(AUTH_ROLE_KEY);
+            localStorage.removeItem(AUTH_USER_ID_KEY);
+            window.location.href = 'index.html';
+        }
+
+        async function apiFetch(path, options = {}) {
+            const token = getToken();
+            if (!token) {
+                clearSession();
+                throw new Error('Missing authentication token.');
+            }
+
+            const headers = {
+                ...(options.headers || {}),
+                Authorization: `Bearer ${token}`,
+            };
+
+            const response = await fetchWithFallback(path, {
+                ...options,
+                headers,
+            });
+
+            const payload = await response.json().catch(() => ({}));
+            if (response.status === 401) {
+                clearSession();
+                throw new Error('Your session has expired. Please log in again.');
+            }
+            if (!response.ok) {
+                throw new Error(payload.detail || 'Request failed.');
+            }
+            return payload;
+        }
+
+        function escapeHtml(value) {
+            return String(value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function setMessage(elementId, message, isError = false) {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.style.color = isError ? '#dc2626' : 'var(--muted-blue)';
+        }
+
+        function renderUseCase(detail) {
+            document.getElementById('useCaseCode').textContent = detail.code || `EL-${detail.id}`;
+            document.getElementById('useCaseTitle').textContent = detail.title;
+            document.getElementById('useCaseDescription').textContent = detail.description;
+
+            const tagContainer = document.getElementById('useCaseTags');
+            tagContainer.innerHTML = (detail.key_concepts || [])
+                .map((tag) => `<div class="tag">${escapeHtml(tag)}</div>`)
+                .join('');
+
+            document.getElementById('useCaseOutput').innerHTML = `<span>Output:</span> ${escapeHtml(detail.output_description || 'Submission accepted and review-ready artifacts.')}`;
+
+            const workflowList = document.getElementById('workflowList');
+            workflowList.innerHTML = (detail.workflow_steps || [])
+                .map((step) => `
+                    <div class="instruction-item">
+                        <span class="arrow">
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                                <polyline points="12 5 19 12 12 19"></polyline>
+                            </svg>
+                        </span>
+                        <p>${escapeHtml(step)}</p>
+                    </div>
+                `)
+                .join('');
+        }
+
+        function renderNoTaskState(message) {
+            const safeMessage = message || 'No task assigned yet. Stay ready — your next challenge is coming.';
+            document.getElementById('useCaseCode').textContent = '--';
+            document.getElementById('useCaseTitle').textContent = 'No Task Assigned';
+            document.getElementById('useCaseDescription').textContent = safeMessage;
+            document.getElementById('useCaseTags').innerHTML = '<div class="tag">Awaiting Assignment</div>';
+            document.getElementById('useCaseOutput').innerHTML = '<span>Output:</span> Assignment pending.';
+            document.getElementById('workflowList').innerHTML = `
+                <div class="instruction-item">
+                    <span class="arrow">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                            <polyline points="12 5 19 12 12 19"></polyline>
+                        </svg>
+                    </span>
+                    <p>${escapeHtml(safeMessage)}</p>
+                </div>
+            `;
+        }
+
+        function setSubmissionEnabled(enabled) {
+            const gitInput = document.getElementById('gitUrl');
+            const videoInput = document.getElementById('videoUpload');
+            const repoButton = document.getElementById('repoSubmitBtn');
+            const videoButton = document.getElementById('videoSubmitBtn');
+
+            if (gitInput) {
+                gitInput.disabled = !enabled;
+            }
+            if (videoInput) {
+                videoInput.disabled = !enabled;
+            }
+            if (repoButton) {
+                repoButton.disabled = !enabled;
+            }
+            if (videoButton) {
+                videoButton.disabled = !enabled;
+            }
+        }
+
+        async function loadSubmissionState() {
+            const result = await apiFetch(`/submission/get?use_case_id=${encodeURIComponent(String(activeUseCaseId))}`);
+            if (!Array.isArray(result) || result.length === 0) {
+                return;
+            }
+
+            const current = result[0];
+            if (current.repo_url) {
+                document.getElementById('gitUrl').value = current.repo_url;
+            }
+            setMessage('repoMessage', `Current status: ${String(current.status || '').toUpperCase()}`);
+        }
+
+        async function initializeStudentHome() {
+            try {
+                const listResponse = await apiFetch('/usecase/list');
+                const useCases = Array.isArray(listResponse)
+                    ? listResponse
+                    : (listResponse?.items || []);
+                const noTaskMessage = Array.isArray(listResponse)
+                    ? null
+                    : listResponse?.message;
+
+                if (!Array.isArray(useCases) || useCases.length === 0) {
+                    activeUseCaseId = null;
+                    renderNoTaskState(noTaskMessage);
+                    setSubmissionEnabled(false);
+                    setMessage(
+                        'repoMessage',
+                        noTaskMessage || 'No task assigned yet. Stay ready — your next challenge is coming.'
+                    );
+                    return;
+                }
+
+                const selected = useCases[0];
+                activeUseCaseId = selected.id ?? selected.code;
+                setSubmissionEnabled(true);
+                const detail = await apiFetch(`/usecase/get/${encodeURIComponent(String(activeUseCaseId))}`);
+                renderUseCase(detail);
+                await loadSubmissionState();
+            } catch (error) {
+                setMessage('repoMessage', error.message || 'Unable to load use case details.', true);
+            }
+        }
+
+        function updateFileName() {
+            const input = document.getElementById('videoUpload');
+            const label = document.getElementById('fileText');
+            if (input.files.length > 0) {
+                const fileName = input.files[0].name;
+                label.textContent = `File: ${fileName.length > 22 ? `${fileName.substring(0, 22)}...` : fileName}`;
+                label.style.color = 'var(--primary-night-blue)';
+            }
+        }
+
+        async function submitRepo() {
+            const gitUrl = document.getElementById('gitUrl').value.trim();
+            if (!gitUrl) {
+                setMessage('repoMessage', 'Please provide a repository URL.', true);
+                return;
+            }
+            if (!activeUseCaseId) {
+                setMessage('repoMessage', 'No task assigned yet. Stay ready — your next challenge is coming.', true);
+                return;
+            }
+
+            const button = document.getElementById('repoSubmitBtn');
+            button.textContent = 'Processing...';
+            button.disabled = true;
+
+            try {
+                await apiFetch('/submission/repo-link', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        use_case_id: String(activeUseCaseId),
+                        repo_url: gitUrl,
+                    }),
+                });
+                document.getElementById('repoSuccess').style.display = 'flex';
+                setMessage('repoMessage', 'Repository linked successfully.');
+            } catch (error) {
+                setMessage('repoMessage', error.message || 'Could not submit repository URL.', true);
+            } finally {
+                button.textContent = 'submit';
+                button.disabled = false;
+            }
+        }
+
+        async function submitVideo() {
+            const input = document.getElementById('videoUpload');
+            if (input.files.length === 0) {
+                setMessage('videoMessage', 'Please select a video file first.', true);
+                return;
+            }
+            if (!activeUseCaseId) {
+                setMessage('videoMessage', 'No task assigned yet. Stay ready — your next challenge is coming.', true);
+                return;
+            }
+
+            const button = document.getElementById('videoSubmitBtn');
+            button.textContent = 'Uploading...';
+            button.disabled = true;
+
+            const formData = new FormData();
+            formData.append('use_case_id', String(activeUseCaseId));
+            formData.append('video_file', input.files[0]);
+
+            try {
+                await apiFetch('/submission/video-upload', {
+                    method: 'POST',
+                    body: formData,
+                });
+                document.getElementById('videoSuccess').style.display = 'flex';
+                setMessage('videoMessage', 'Video uploaded successfully.');
+            } catch (error) {
+                setMessage('videoMessage', error.message || 'Could not upload video.', true);
+            } finally {
+                button.textContent = 'Upload';
+                button.disabled = false;
+            }
+        }
+
+        async function handleLogout(event) {
+            event.preventDefault();
+            try {
+                await apiFetch('/auth/logout', { method: 'POST' });
+            } catch (_) {
+                // Ignore logout API errors and clear local session anyway.
+            } finally {
+                clearSession();
+            }
+        }
+
+        if (logoutLink) {
+            logoutLink.addEventListener('click', handleLogout);
+        }
+
+        initializeStudentHome();
+    </script>
+</body>
+</html>

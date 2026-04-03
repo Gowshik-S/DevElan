@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DevÉlan - Profile</title>
+    <style>
+        :root {
+            --primary-night-blue: #1e3a8a;
+            --primary-cyan: #00d4ff;
+            --soft-white: #f5ede0;
+            --deep-black: #161311;
+            --muted-blue: #546877;
+            --bg-grey: #e2e8f0; 
+            --pure-white: #ffffff;
+            --transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-grey);
+            background-image: 
+                linear-gradient(rgba(0, 212, 255, 0.15) 1.5px, transparent 1.5px),
+                linear-gradient(90deg, rgba(0, 212, 255, 0.15) 1.5px, transparent 1.5px);
+            background-size: 40px 40px;
+            color: var(--deep-black);
+            min-height: 100vh;
+            overflow-x: hidden;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            width: 100%;
+            padding: 1.5rem 5%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 1000;
+            background: transparent;
+        }
+
+        .logo {
+            font-size: 1.8rem;
+            font-weight: 900;
+            letter-spacing: -1px;
+            color: var(--deep-black);
+            cursor: pointer;
+        }
+
+        .logo span { color: var(--primary-night-blue); }
+
+        .nav-wrapper {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .theme-toggle {
+            width: 40px;
+            height: 40px;
+            border-radius: 999px;
+            border: 1px solid rgba(255, 255, 255, 0.6);
+            background: rgba(255, 255, 255, 0.45);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--deep-black);
+            cursor: pointer;
+            transition: var(--transition);
+            box-shadow: 0 10px 30px rgba(30, 58, 138, 0.1);
+        }
+
+        .theme-toggle:hover {
+            transform: translateY(-2px);
+            border-color: rgba(30, 58, 138, 0.4);
+        }
+
+        .theme-toggle svg {
+            width: 16px;
+            height: 16px;
+            stroke: currentColor;
+            fill: none;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        .theme-toggle .icon-sun { display: none; }
+        [data-theme="dark"] .theme-toggle .icon-sun { display: block; }
+        [data-theme="dark"] .theme-toggle .icon-moon { display: none; }
+
+        nav {
+            background: rgba(255, 255, 255, 0.35); 
+            backdrop-filter: blur(8px); 
+            -webkit-backdrop-filter: blur(8px);
+            padding: 0.4rem;
+            border-radius: 100px;
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            display: flex;
+            gap: 0.2rem;
+            box-shadow: 0 10px 30px rgba(30, 58, 138, 0.1);
+        }
+
+        nav a {
+            text-decoration: none;
+            color: var(--deep-black);
+            font-weight: 700;
+            font-size: 0.8rem;
+            padding: 0.5rem 1.2rem;
+            border-radius: 50px;
+            transition: var(--transition);
+        }
+
+        nav a:hover:not(.locked) { color: var(--primary-night-blue); }
+        nav a.active { background: var(--primary-night-blue); color: white; box-shadow: 0 4px 15px rgba(30, 58, 138, 0.3); }
+        nav a.logout { color: #ef4444; }
+        nav a.logout:hover { background: rgba(239, 68, 68, 0.1); }
+        
+        nav a.locked {
+            opacity: 0.55;
+            cursor: not-allowed;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .nav-icon {
+            width: 12px;
+            height: 12px;
+            stroke: currentColor;
+            fill: none;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        main {
+            flex: 1;
+            padding: 1rem 5% 2rem;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            animation: fadeIn 0.8s ease-out;
+        }
+
+        .profile-card {
+            background: var(--pure-white);
+            width: 100%;
+            max-width: 800px;
+            border-radius: 32px;
+            padding: 2rem;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .profile-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            border-bottom: 2px solid var(--bg-grey);
+            padding-bottom: 1rem;
+        }
+
+        .user-meta h1 { font-size: 1.6rem; font-weight: 900; }
+
+        .profile-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.2rem;
+        }
+
+        .field-group { display: flex; flex-direction: column; gap: 0.3rem; }
+        .field-group label { font-weight: 800; font-size: 0.65rem; color: var(--muted-blue); text-transform: uppercase; letter-spacing: 1px; }
+        
+        .static-field {
+            padding: 0.8rem;
+            background: var(--bg-grey);
+            border-radius: 10px;
+            font-weight: 700;
+            font-size: 0.9rem;
+            color: var(--deep-black);
+            border: 1px solid transparent;
+        }
+
+        .editable-field {
+            padding: 0.8rem;
+            background: var(--soft-white);
+            border-radius: 10px;
+            font-weight: 700;
+            font-size: 0.9rem;
+            color: var(--deep-black);
+            border: 2px solid transparent;
+            outline: none;
+            transition: 0.3s;
+        }
+
+        .editable-field:focus {
+            border-color: var(--primary-night-blue);
+            background: white;
+        }
+
+        .save-btn {
+            background: var(--deep-black);
+            color: white;
+            padding: 1rem;
+            border: none;
+            border-radius: 14px;
+            font-weight: 800;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .save-btn:hover {
+            background: var(--primary-night-blue);
+            transform: translateY(-2px);
+        }
+
+        [data-theme="dark"] {
+            --dark-bg: #0d1110;
+            --dark-surface: #18201e;
+            --dark-surface-2: #24302d;
+            --dark-text: #f3f6f2;
+            --dark-muted: #b7c2bb;
+            --dark-accent: #2ec4b6;
+            --dark-highlight: #9fe870;
+            --dark-premium: #c9883d;
+            --primary-night-blue: var(--dark-accent);
+            --accent-blue: var(--dark-accent);
+            --primary-cyan: var(--dark-highlight);
+        }
+
+        [data-theme="dark"] body {
+            background-color: var(--dark-bg);
+            color: var(--dark-text);
+            background-image:
+                linear-gradient(rgba(46, 196, 182, 0.11) 1.5px, transparent 1.5px),
+                linear-gradient(90deg, rgba(201, 136, 61, 0.08) 1.5px, transparent 1.5px);
+        }
+
+        [data-theme="dark"] .logo,
+        [data-theme="dark"] nav a,
+        [data-theme="dark"] .user-meta h1,
+        [data-theme="dark"] .static-field,
+        [data-theme="dark"] .editable-field {
+            color: var(--dark-text);
+        }
+
+        [data-theme="dark"] .logo span {
+            color: var(--dark-accent);
+        }
+
+        [data-theme="dark"] nav {
+            background: rgba(22, 24, 32, 0.88);
+            border-color: rgba(46, 196, 182, 0.35);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+        }
+
+        [data-theme="dark"] nav a:hover:not(.locked) {
+            color: var(--dark-accent);
+        }
+
+        [data-theme="dark"] nav a.active {
+            background: var(--dark-accent);
+            color: #072824;
+            box-shadow: 0 4px 15px rgba(46, 196, 182, 0.32);
+        }
+
+        [data-theme="dark"] .theme-toggle {
+            background: rgba(22, 24, 32, 0.94);
+            border-color: rgba(46, 196, 182, 0.35);
+            color: var(--dark-text);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+        }
+
+        [data-theme="dark"] .theme-toggle:hover {
+            border-color: var(--dark-premium);
+            background: rgba(201, 136, 61, 0.2);
+        }
+
+        [data-theme="dark"] .profile-card {
+            background: rgba(26, 29, 38, 0.92);
+            border-color: rgba(46, 196, 182, 0.22);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.55);
+        }
+
+        [data-theme="dark"] .profile-header {
+            border-bottom-color: #30384a;
+        }
+
+        [data-theme="dark"] .field-group label {
+            color: var(--dark-muted);
+        }
+
+        [data-theme="dark"] .static-field {
+            background: #141824;
+            border-color: #30384a;
+        }
+
+        [data-theme="dark"] .editable-field {
+            background: #141824;
+            border-color: #30384a;
+        }
+
+        [data-theme="dark"] .editable-field:focus {
+            border-color: var(--dark-accent);
+            background: #1b202b;
+        }
+
+        [data-theme="dark"] .save-btn {
+            background: var(--dark-accent);
+            color: #072824;
+        }
+
+        [data-theme="dark"] .save-btn:hover {
+            background: #26aea1;
+            color: #072824;
+        }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo" onclick="window.location.href='index.html'">Dev<span>Élan.</span></div>
+        <div class="nav-wrapper">
+            <nav>
+                <a href="user_home.html">Home</a>
+                <a href="#" class="locked">Leaderboard
+                    <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <rect x="4" y="11" width="16" height="10" rx="2"></rect>
+                        <path d="M8 11V8a4 4 0 1 1 8 0v3"></path>
+                    </svg>
+                </a>
+                <a href="user_profile.html" class="active">Profile</a>
+            </nav>
+            <nav>
+                <a href="#" class="logout" id="logoutLink">Logout</a>
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        <div class="profile-card">
+            <div class="profile-header">
+                <div class="user-meta">
+                    <h1 id="profileDisplayName">John Doe</h1>
+                </div>
+            </div>
+
+            <form class="profile-grid" id="profileForm">
+                <div class="field-group">
+                    <label>Full Name</label>
+                    <div class="static-field" id="profileFullName">John Doe</div>
+                </div>
+                <div class="field-group">
+                    <label>Register Number</label>
+                    <div class="static-field" id="profileRegister">DEV20240987</div>
+                </div>
+                <div class="field-group">
+                    <label>Date of Birth</label>
+                    <div class="static-field" id="profileDob">--</div>
+                </div>
+                <div class="field-group">
+                    <label>Class</label>
+                    <div class="static-field" id="profileClass">--</div>
+                </div>
+                <div class="field-group">
+                    <label>Year / Semester</label>
+                    <div class="static-field" id="profileYearSemester">--</div>
+                </div>
+
+                <div class="field-group">
+                    <label>Phone Number</label>
+                    <input type="text" class="editable-field" id="profilePhone" value="" placeholder="Enter phone number" title="Phone number">
+                </div>
+                <div class="field-group" style="grid-column: span 1;">
+                    <label>Email Address</label>
+                    <input type="email" class="editable-field" id="profileEmail" value="" placeholder="Enter email address" title="Email address">
+                </div>
+
+                <div style="grid-column: span 2; display: flex; justify-content: flex-end;">
+                    <button type="submit" class="save-btn" id="updateProfileBtn">Update Profile</button>
+                </div>
+                <p id="profileMessage" style="grid-column: span 2; text-align:right; font-weight:700; font-size:0.8rem; color:var(--muted-blue);"></p>
+            </form>
+        </div>
+    </main>
+
+    <script>
+        const logoutLink = document.getElementById('logoutLink');
+        const profileForm = document.getElementById('profileForm');
+        const updateProfileBtn = document.getElementById('updateProfileBtn');
+        const profileMessage = document.getElementById('profileMessage');
+        const API_ROOTS = [
+            'http://127.0.0.1:8000/api/v1',
+            'http://localhost:8000/api/v1',
+        ];
+        let activeApiRoot = localStorage.getItem('devela-api-root') || API_ROOTS[0];
+        const AUTH_TOKEN_KEY = 'devela-access-token';
+        const AUTH_ROLE_KEY = 'devela-user-role';
+        const AUTH_USER_ID_KEY = 'devela-user-id';
+
+        function getApiRoots() {
+            const merged = [activeApiRoot, ...API_ROOTS];
+            return merged.filter((value, index) => value && merged.indexOf(value) === index);
+        }
+
+        async function fetchWithFallback(path, options) {
+            let lastError = null;
+            const candidates = getApiRoots();
+
+            for (const candidate of candidates) {
+                try {
+                    const response = await fetch(`${candidate}${path}`, options);
+                    activeApiRoot = candidate;
+                    localStorage.setItem('devela-api-root', candidate);
+                    return response;
+                } catch (error) {
+                    lastError = error;
+                }
+            }
+
+            throw new Error(
+                `Unable to reach backend at ${candidates.join(' or ')}. Ensure the FastAPI server is running.`
+            );
+        }
+
+        function getToken() {
+            return localStorage.getItem(AUTH_TOKEN_KEY);
+        }
+
+        function clearSession() {
+            localStorage.removeItem(AUTH_TOKEN_KEY);
+            localStorage.removeItem(AUTH_ROLE_KEY);
+            localStorage.removeItem(AUTH_USER_ID_KEY);
+            window.location.href = 'index.html';
+        }
+
+        function setMessage(text, isError = false) {
+            profileMessage.textContent = text;
+            profileMessage.style.color = isError ? '#dc2626' : 'var(--muted-blue)';
+        }
+
+        function formatDate(rawDate) {
+            if (!rawDate) {
+                return '--';
+            }
+            const parsed = new Date(rawDate);
+            if (Number.isNaN(parsed.getTime())) {
+                return '--';
+            }
+            return parsed.toLocaleDateString(undefined, {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric',
+            });
+        }
+
+        async function apiFetch(path, options = {}) {
+            const token = getToken();
+            if (!token) {
+                clearSession();
+                throw new Error('Missing authentication token.');
+            }
+
+            const headers = {
+                ...(options.headers || {}),
+                Authorization: `Bearer ${token}`,
+            };
+
+            const response = await fetchWithFallback(path, {
+                ...options,
+                headers,
+            });
+            const payload = await response.json().catch(() => ({}));
+
+            if (response.status === 401) {
+                clearSession();
+                throw new Error('Session expired. Please log in again.');
+            }
+            if (!response.ok) {
+                throw new Error(payload.detail || 'Request failed.');
+            }
+            return payload;
+        }
+
+        function renderProfile(profile) {
+            document.getElementById('profileDisplayName').textContent = profile.full_name || '--';
+            document.getElementById('profileFullName').textContent = profile.full_name || '--';
+            document.getElementById('profileRegister').textContent = profile.register_no || '--';
+            document.getElementById('profileDob').textContent = formatDate(profile.dob);
+            document.getElementById('profileClass').textContent = profile.class_name || '--';
+            document.getElementById('profileYearSemester').textContent = profile.year_semester || '--';
+            document.getElementById('profilePhone').value = profile.phone || '';
+            document.getElementById('profileEmail').value = profile.email || '';
+        }
+
+        async function loadProfile() {
+            try {
+                const profile = await apiFetch('/profile/get');
+                renderProfile(profile);
+            } catch (error) {
+                setMessage(error.message || 'Unable to load profile.', true);
+            }
+        }
+
+        async function updateProfile(event) {
+            event.preventDefault();
+
+            const payload = {
+                phone: document.getElementById('profilePhone').value.trim(),
+                email: document.getElementById('profileEmail').value.trim(),
+            };
+
+            updateProfileBtn.disabled = true;
+            updateProfileBtn.textContent = 'Updating...';
+            setMessage('');
+
+            try {
+                const updated = await apiFetch('/profile/update', {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(payload),
+                });
+                renderProfile(updated);
+                setMessage('Profile updated successfully.');
+            } catch (error) {
+                setMessage(error.message || 'Unable to update profile.', true);
+            } finally {
+                updateProfileBtn.disabled = false;
+                updateProfileBtn.textContent = 'Update Profile';
+            }
+        }
+
+        async function handleLogout(event) {
+            event.preventDefault();
+            try {
+                await apiFetch('/auth/logout', { method: 'POST' });
+            } catch (_) {
+                // Ignore API logout failures.
+            } finally {
+                clearSession();
+            }
+        }
+
+        if (logoutLink) {
+            logoutLink.addEventListener('click', handleLogout);
+        }
+
+        if (profileForm) {
+            profileForm.addEventListener('submit', updateProfile);
+        }
+
+        loadProfile();
+    </script>
+
+</body>
+</html>

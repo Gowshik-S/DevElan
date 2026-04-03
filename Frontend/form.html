@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DevÉlan - Submissions Viewer</title>
+    <style>
+        :root {
+            --primary-night-blue: #1e3a8a; 
+            --accent-blue: #3b82f6;
+            --primary-cyan: #00d4ff; 
+            --soft-white: #f5ede0;
+            --deep-black: #161311;
+            --muted-blue: #546877;
+            --bg-grey: #e2e8f0; 
+            --pure-white: #ffffff;
+            --transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+
+        body {
+            background-color: var(--bg-grey);
+            background-image: 
+                linear-gradient(rgba(0, 212, 255, 0.15) 1.5px, transparent 1.5px),
+                linear-gradient(90deg, rgba(0, 212, 255, 0.15) 1.5px, transparent 1.5px);
+            background-size: 40px 40px;
+            color: var(--deep-black);
+            min-height: 100vh;
+            overflow-x: hidden;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header { width: 100%; padding: 1.5rem 5%; display: flex; justify-content: space-between; align-items: center; z-index: 1000; }
+        .logo { font-size: 1.8rem; font-weight: 900; letter-spacing: -1px; color: var(--deep-black); cursor: pointer; }
+        .logo span { color: var(--primary-night-blue); }
+        
+        .nav-wrapper { display: flex; gap: 1rem; pointer-events: auto; }
+
+        .theme-toggle {
+            width: 40px;
+            height: 40px;
+            border-radius: 999px;
+            border: 1px solid rgba(255, 255, 255, 0.6);
+            background: rgba(255, 255, 255, 0.45);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--deep-black);
+            cursor: pointer;
+            transition: var(--transition);
+            box-shadow: 0 10px 30px rgba(30, 58, 138, 0.1);
+        }
+
+        .theme-toggle:hover {
+            transform: translateY(-2px);
+            border-color: rgba(30, 58, 138, 0.4);
+        }
+
+        .theme-toggle svg {
+            width: 16px;
+            height: 16px;
+            stroke: currentColor;
+            fill: none;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        .theme-toggle .icon-sun { display: none; }
+        [data-theme="dark"] .theme-toggle .icon-sun { display: block; }
+        [data-theme="dark"] .theme-toggle .icon-moon { display: none; }
+
+        nav {
+            background: rgba(255, 255, 255, 0.35); 
+            backdrop-filter: blur(8px); 
+            padding: 0.4rem;
+            border-radius: 100px;
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            display: flex;
+            gap: 0.2rem;
+            box-shadow: 0 10px 30px rgba(30, 58, 138, 0.1);
+        }
+
+        nav a { text-decoration: none; color: var(--deep-black); font-weight: 700; font-size: 0.8rem; padding: 0.5rem 1.2rem; border-radius: 50px; transition: var(--transition); }
+        nav a:hover { color: var(--primary-night-blue); }
+        nav a.active { background: var(--primary-night-blue); color: white; }
+        nav a.logout { color: #ef4444; }
+
+        main { flex: 1; padding: 0 5% 2rem; display: flex; flex-direction: column; gap: 1rem; min-height: 0; }
+        
+        .search-container {
+            width: 100%;
+            background: var(--pure-white);
+            padding: 0.8rem 1.5rem;
+            border-radius: 100px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+            border: 1px solid rgba(30, 58, 138, 0.1);
+            flex-shrink: 0;
+        }
+
+        .search-container input {
+            flex: 1;
+            border: none;
+            outline: none;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--deep-black);
+        }
+
+        .table-card {
+            background: var(--pure-white);
+            border-radius: 24px;
+            flex: 1;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 15px 35px -12px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            min-height: 0; 
+        }
+
+        .table-header {
+            display: grid;
+            grid-template-columns: 1.2fr 1fr 1.5fr 1fr 0.8fr;
+            padding: 1.2rem 2rem;
+            background: var(--deep-black);
+            color: white;
+            font-size: 0.7rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            flex-shrink: 0;
+        }
+
+        .table-body {
+            flex: 1;
+            overflow-y: auto;
+            scroll-behavior: smooth;
+        }
+
+        .row {
+            display: grid;
+            grid-template-columns: 1.2fr 1fr 1.5fr 1fr 0.8fr;
+            padding: 1.2rem 2rem;
+            border-bottom: 1px solid var(--bg-grey);
+            align-items: center;
+            font-size: 0.85rem;
+            transition: 0.2s;
+        }
+
+        .row:hover { background: rgba(0, 212, 255, 0.03); }
+
+        .tag-status { padding: 4px 10px; border-radius: 6px; font-size: 0.7rem; font-weight: 800; }
+        .status-done { background: #e7f7ed; color: #1e7e34; }
+        .status-pending { background: #fff8e1; color: #b7791f; }
+        .status-disabled { background: #f1f5f9; color: #94a3b8; }
+
+        .link-text { color: var(--accent-blue); text-decoration: none; font-weight: 600; }
+        .link-text:hover { text-decoration: underline; }
+
+        .btn-watch {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: var(--primary-night-blue);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 0.75rem;
+            font-weight: 800;
+            cursor: pointer;
+            border: none;
+            transition: 0.3s;
+            width: fit-content;
+        }
+
+        .btn-watch:hover {
+            transform: scale(1.05);
+            background: var(--accent-blue);
+        }
+
+        /* --- Video Modal --- */
+        .video-modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.9);
+            backdrop-filter: blur(10px);
+            z-index: 2000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+
+        .modal-content {
+            background: var(--deep-black);
+            width: 100%;
+            max-width: 1000px;
+            border-radius: 24px;
+            overflow: hidden;
+            position: relative;
+            box-shadow: 0 25px 80px rgba(0,0,0,0.8);
+            border: 1px solid rgba(255,255,255,0.1);
+            animation: modalPop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        @keyframes modalPop {
+            from { transform: scale(0.9); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        .modal-header {
+            padding: 1.2rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: white;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .close-modal {
+            background: rgba(255,255,255,0.1);
+            border: none;
+            color: white;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .close-modal svg {
+            width: 16px;
+            height: 16px;
+            stroke: currentColor;
+            stroke-width: 2.4;
+            stroke-linecap: round;
+        }
+
+        .close-modal:hover { background: #ef4444; }
+
+        .video-container {
+            width: 100%;
+            aspect-ratio: 16 / 9;
+            background: #000;
+        }
+
+        video {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(30, 58, 138, 0.2); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--primary-night-blue); }
+
+        [data-theme="dark"] {
+            --dark-bg: #0d1110;
+            --dark-surface: #18201e;
+            --dark-surface-2: #24302d;
+            --dark-text: #f3f6f2;
+            --dark-muted: #b7c2bb;
+            --dark-accent: #2ec4b6;
+            --dark-highlight: #9fe870;
+            --dark-premium: #c9883d;
+            --primary-night-blue: var(--dark-accent);
+            --accent-blue: var(--dark-accent);
+            --primary-cyan: var(--dark-highlight);
+        }
+
+        [data-theme="dark"] body {
+            background-color: var(--dark-bg);
+            color: var(--dark-text);
+            background-image:
+                linear-gradient(rgba(46, 196, 182, 0.11) 1.5px, transparent 1.5px),
+                linear-gradient(90deg, rgba(201, 136, 61, 0.08) 1.5px, transparent 1.5px);
+        }
+
+        [data-theme="dark"] .logo,
+        [data-theme="dark"] nav a,
+        [data-theme="dark"] .search-container input,
+        [data-theme="dark"] .row,
+        [data-theme="dark"] .table-header,
+        [data-theme="dark"] .modal-header h3 {
+            color: var(--dark-text);
+        }
+
+        [data-theme="dark"] .logo span {
+            color: var(--dark-accent);
+        }
+
+        [data-theme="dark"] nav {
+            background: rgba(22, 24, 32, 0.88);
+            border-color: rgba(46, 196, 182, 0.35);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+        }
+
+        [data-theme="dark"] nav a:hover {
+            color: var(--dark-accent);
+        }
+
+        [data-theme="dark"] nav a.active {
+            color: #072824;
+            box-shadow: 0 4px 15px rgba(46, 196, 182, 0.3);
+        }
+
+        [data-theme="dark"] .theme-toggle {
+            background: rgba(22, 24, 32, 0.94);
+            border-color: rgba(46, 196, 182, 0.35);
+            color: var(--dark-text);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+        }
+
+        [data-theme="dark"] .theme-toggle:hover {
+            border-color: var(--dark-premium);
+            background: rgba(201, 136, 61, 0.2);
+        }
+
+        [data-theme="dark"] .search-container,
+        [data-theme="dark"] .table-card {
+            background: rgba(26, 29, 38, 0.92);
+            border-color: rgba(46, 196, 182, 0.22);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
+        }
+
+        [data-theme="dark"] .search-container input::placeholder {
+            color: #8f8372;
+        }
+
+        [data-theme="dark"] .table-header {
+            background: #151925;
+        }
+
+        [data-theme="dark"] .row {
+            border-bottom-color: #31384a;
+        }
+
+        [data-theme="dark"] .row:hover {
+            background: rgba(46, 196, 182, 0.14);
+        }
+
+        [data-theme="dark"] .status-done { background: rgba(159, 232, 112, 0.2); color: var(--dark-highlight); }
+        [data-theme="dark"] .status-pending { background: rgba(201, 136, 61, 0.2); color: var(--dark-premium); }
+        [data-theme="dark"] .status-disabled { background: rgba(100, 116, 139, 0.28); color: #cbd5e1; }
+
+        [data-theme="dark"] .video-modal {
+            background: rgba(10, 10, 14, 0.84);
+        }
+
+        [data-theme="dark"] .modal-content {
+            background: rgba(26, 29, 38, 0.96);
+            border-color: rgba(46, 196, 182, 0.28);
+        }
+
+        [data-theme="dark"] .modal-header p {
+            color: var(--dark-muted);
+        }
+
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo">Dev<span>Élan.</span></div>
+        <div class="nav-wrapper">
+            <nav>
+                <a href="admin.html">Management</a>
+                <a href="form.html" class="active">Submissions</a>
+            </nav>
+            <nav>
+                <a href="#" class="logout" id="logoutLink">Logout</a>
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        <div class="search-container">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--muted-blue)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" id="searchInput" placeholder="Search by Name, Reg No or Project..." onkeyup="filterSubmissions()">
+        </div>
+
+        <div class="table-card">
+            <div class="table-header">
+                <div>User Name</div>
+                <div>Reg No</div>
+                <div>Project / Repo</div>
+                <div>Evaluation Video</div>
+                <div>Status</div>
+            </div>
+            <div class="table-body" id="tableBody">
+                <div class="row" style="grid-template-columns: 1fr;">
+                    <div style="text-align:center;color:var(--muted-blue);font-weight:700;">Loading submissions...</div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Video Modal -->
+    <div class="video-modal" id="videoModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <h3 id="modalTitle" style="font-size: 1rem; font-weight: 800; margin-bottom: 2px;">Reviewing Submission</h3>
+                    <p id="modalSubtitle" style="font-size: 0.75rem; color: var(--muted-blue); font-weight: 600;"></p>
+                </div>
+                <button class="close-modal" onclick="closeVideo()" aria-label="Close video modal">
+                    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div class="video-container">
+                <video id="submissionVideo" controls poster="https://via.placeholder.com/1280x720/161311/ffffff?text=Loading+Evaluation+Recording...">
+                    Your browser does not support the video tag.
+                </video>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const logoutLink = document.getElementById('logoutLink');
+        const searchInput = document.getElementById('searchInput');
+        const tableBody = document.getElementById('tableBody');
+        const API_ROOTS = [
+            'http://127.0.0.1:8000/api/v1',
+            'http://localhost:8000/api/v1',
+        ];
+        let activeApiRoot = localStorage.getItem('devela-api-root') || API_ROOTS[0];
+        const AUTH_TOKEN_KEY = 'devela-access-token';
+        const AUTH_ROLE_KEY = 'devela-user-role';
+        const AUTH_USER_ID_KEY = 'devela-user-id';
+        let searchTimer = null;
+        let currentVideoObjectUrl = null;
+
+        function getApiRoots() {
+            const merged = [activeApiRoot, ...API_ROOTS];
+            return merged.filter((value, index) => value && merged.indexOf(value) === index);
+        }
+
+        async function fetchWithFallback(path, options) {
+            let lastError = null;
+            const candidates = getApiRoots();
+
+            for (const candidate of candidates) {
+                try {
+                    const response = await fetch(`${candidate}${path}`, options);
+                    activeApiRoot = candidate;
+                    localStorage.setItem('devela-api-root', candidate);
+                    return response;
+                } catch (error) {
+                    lastError = error;
+                }
+            }
+
+            throw new Error(
+                `Unable to reach backend at ${candidates.join(' or ')}. Ensure the FastAPI server is running.`
+            );
+        }
+
+        function getToken() {
+            return localStorage.getItem(AUTH_TOKEN_KEY);
+        }
+
+        function clearSession() {
+            localStorage.removeItem(AUTH_TOKEN_KEY);
+            localStorage.removeItem(AUTH_ROLE_KEY);
+            localStorage.removeItem(AUTH_USER_ID_KEY);
+            window.location.href = 'index.html';
+        }
+
+        function requireAdminSession() {
+            const role = localStorage.getItem(AUTH_ROLE_KEY);
+            if (role !== 'admin') {
+                window.location.href = 'index.html';
+            }
+        }
+
+        async function apiFetch(path, options = {}) {
+            const token = getToken();
+            if (!token) {
+                clearSession();
+                throw new Error('Missing authentication token.');
+            }
+
+            const response = await fetchWithFallback(path, {
+                ...options,
+                headers: {
+                    ...(options.headers || {}),
+                    Authorization: `Bearer ${token}`,
+                },
+            });
+
+            const payload = await response.json().catch(() => ({}));
+            if (response.status === 401) {
+                clearSession();
+                throw new Error('Session expired. Please log in again.');
+            }
+            if (!response.ok) {
+                throw new Error(payload.detail || 'Request failed.');
+            }
+            return payload;
+        }
+
+        function statusClass(status) {
+            const normalized = String(status || '').toLowerCase();
+            if (normalized === 'submitted') {
+                return 'status-done';
+            }
+            if (normalized === 'no-video') {
+                return 'status-disabled';
+            }
+            return 'status-pending';
+        }
+
+        function statusLabel(status) {
+            const normalized = String(status || 'pending').replace(/-/g, ' ');
+            return normalized.replace(/\b\w/g, (ch) => ch.toUpperCase());
+        }
+
+        function makeEmptyRow(message) {
+            const row = document.createElement('div');
+            row.className = 'row';
+            row.style.gridTemplateColumns = '1fr';
+
+            const content = document.createElement('div');
+            content.style.textAlign = 'center';
+            content.style.color = 'var(--muted-blue)';
+            content.style.fontWeight = '700';
+            content.textContent = message;
+
+            row.appendChild(content);
+            return row;
+        }
+
+        function renderSubmissions(items) {
+            tableBody.innerHTML = '';
+            if (!Array.isArray(items) || items.length === 0) {
+                tableBody.appendChild(makeEmptyRow('No submissions found for the current filter.'));
+                return;
+            }
+
+            items.forEach((item) => {
+                const row = document.createElement('div');
+                row.className = 'row';
+
+                const userCell = document.createElement('div');
+                userCell.style.fontWeight = '700';
+                userCell.textContent = item.user_name || '--';
+
+                const regCell = document.createElement('div');
+                regCell.style.color = 'var(--muted-blue)';
+                regCell.textContent = item.register_no || '--';
+
+                const repoCell = document.createElement('div');
+                if (item.repo_link) {
+                    const repoLink = document.createElement('a');
+                    repoLink.className = 'link-text';
+                    repoLink.href = item.repo_link;
+                    repoLink.target = '_blank';
+                    repoLink.rel = 'noopener noreferrer';
+                    repoLink.textContent = item.repo_link;
+                    repoCell.appendChild(repoLink);
+                } else {
+                    repoCell.style.color = 'var(--muted-blue)';
+                    repoCell.textContent = '-- No Repo Yet --';
+                }
+
+                const videoCell = document.createElement('div');
+                if (item.video_id) {
+                    const watchButton = document.createElement('button');
+                    watchButton.className = 'btn-watch';
+                    watchButton.type = 'button';
+                    watchButton.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>Watch Video';
+                    watchButton.addEventListener('click', () => {
+                        openVideo(item.video_id, item.user_name, item.project_title);
+                    });
+                    videoCell.appendChild(watchButton);
+                } else {
+                    const noVideoTag = document.createElement('span');
+                    noVideoTag.className = 'tag-status status-disabled';
+                    noVideoTag.textContent = 'No Video';
+                    videoCell.appendChild(noVideoTag);
+                }
+
+                const statusCell = document.createElement('div');
+                const statusTag = document.createElement('span');
+                statusTag.className = `tag-status ${statusClass(item.status)}`;
+                statusTag.textContent = statusLabel(item.status);
+                statusCell.appendChild(statusTag);
+
+                row.appendChild(userCell);
+                row.appendChild(regCell);
+                row.appendChild(repoCell);
+                row.appendChild(videoCell);
+                row.appendChild(statusCell);
+
+                tableBody.appendChild(row);
+            });
+        }
+
+        async function loadSubmissions(filterValue = '') {
+            tableBody.innerHTML = '';
+            tableBody.appendChild(makeEmptyRow('Loading submissions...'));
+
+            try {
+                const params = new URLSearchParams({
+                    page: '1',
+                    limit: '100',
+                });
+                const normalized = filterValue.trim();
+                if (normalized) {
+                    params.set('filter_query', normalized);
+                }
+
+                const result = await apiFetch(`/submissions/list?${params.toString()}`);
+                renderSubmissions(result.submissions || []);
+            } catch (error) {
+                tableBody.innerHTML = '';
+                tableBody.appendChild(makeEmptyRow(error.message || 'Unable to load submissions.'));
+            }
+        }
+
+        function filterSubmissions() {
+            const query = searchInput.value;
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(() => {
+                loadSubmissions(query);
+            }, 300);
+        }
+
+        const modal = document.getElementById('videoModal');
+        const video = document.getElementById('submissionVideo');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalSubtitle = document.getElementById('modalSubtitle');
+
+        async function openVideo(videoId, userName, project) {
+            modal.style.display = 'flex';
+            modalTitle.innerText = userName;
+            modalSubtitle.innerText = `Project: ${project}`;
+
+            if (currentVideoObjectUrl) {
+                URL.revokeObjectURL(currentVideoObjectUrl);
+                currentVideoObjectUrl = null;
+            }
+
+            try {
+                const token = getToken();
+                if (!token) {
+                    clearSession();
+                    return;
+                }
+
+                const response = await fetchWithFallback(`/video/stream/${videoId}`, {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                });
+                if (response.status === 401) {
+                    clearSession();
+                    return;
+                }
+                if (!response.ok) {
+                    throw new Error('Unable to load selected video.');
+                }
+
+                const blob = await response.blob();
+                currentVideoObjectUrl = URL.createObjectURL(blob);
+                video.src = currentVideoObjectUrl;
+                video.currentTime = 0;
+                await video.play().catch(() => {});
+            } catch (error) {
+                modalSubtitle.innerText = error.message || 'Failed to stream selected video.';
+            }
+        }
+
+        function closeVideo() {
+            modal.style.display = 'none';
+            video.pause();
+            video.removeAttribute('src');
+            video.load();
+            if (currentVideoObjectUrl) {
+                URL.revokeObjectURL(currentVideoObjectUrl);
+                currentVideoObjectUrl = null;
+            }
+        }
+
+        async function handleLogout(event) {
+            event.preventDefault();
+            try {
+                await apiFetch('/auth/logout', { method: 'POST' });
+            } catch (_) {
+                // Ignore logout errors.
+            } finally {
+                clearSession();
+            }
+        }
+
+        // Close modal on background click or escape key
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) closeVideo();
+        });
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeVideo();
+        });
+
+        if (logoutLink) {
+            logoutLink.addEventListener('click', handleLogout);
+        }
+
+        requireAdminSession();
+        loadSubmissions();
+    </script>
+</body>
+</html>

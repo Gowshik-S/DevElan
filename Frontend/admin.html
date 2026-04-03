@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DevÉlan - Admin Management</title>
+    <style>
+        :root {
+            --primary-night-blue: #1e3a8a; 
+            --accent-blue: #3b82f6;
+            --primary-cyan: #00d4ff; 
+            --soft-white: #f5ede0;
+            --deep-black: #161311;
+            --muted-blue: #546877;
+            --bg-grey: #e2e8f0; 
+            --pure-white: #ffffff;
+            --transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', system-ui, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-grey);
+            background-image: 
+                linear-gradient(rgba(0, 212, 255, 0.15) 1.5px, transparent 1.5px),
+                linear-gradient(90deg, rgba(0, 212, 255, 0.15) 1.5px, transparent 1.5px);
+            background-size: 40px 40px;
+            color: var(--deep-black);
+            min-height: 100vh;
+            overflow-x: hidden;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            width: 100%;
+            padding: 1.5rem 5%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .logo {
+            font-size: 1.8rem;
+            font-weight: 900;
+            letter-spacing: -1px;
+            color: var(--deep-black);
+            cursor: pointer;
+        }
+
+        .logo span { color: var(--primary-night-blue); }
+
+        .nav-wrapper { display: flex; gap: 1rem; }
+
+        .theme-toggle {
+            width: 40px;
+            height: 40px;
+            border-radius: 999px;
+            border: 1px solid rgba(255, 255, 255, 0.6);
+            background: rgba(255, 255, 255, 0.45);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--deep-black);
+            cursor: pointer;
+            transition: var(--transition);
+            box-shadow: 0 10px 30px rgba(30, 58, 138, 0.1);
+        }
+
+        .theme-toggle:hover {
+            transform: translateY(-2px);
+            border-color: rgba(30, 58, 138, 0.4);
+        }
+
+        .theme-toggle svg {
+            width: 16px;
+            height: 16px;
+            stroke: currentColor;
+            fill: none;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        .theme-toggle .icon-sun { display: none; }
+        [data-theme="dark"] .theme-toggle .icon-sun { display: block; }
+        [data-theme="dark"] .theme-toggle .icon-moon { display: none; }
+
+        nav {
+            background: rgba(255, 255, 255, 0.35); 
+            backdrop-filter: blur(8px); 
+            -webkit-backdrop-filter: blur(8px);
+            padding: 0.4rem;
+            border-radius: 100px;
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            display: flex;
+            gap: 0.2rem;
+            box-shadow: 0 10px 30px rgba(30, 58, 138, 0.1);
+        }
+
+        nav a {
+            text-decoration: none;
+            color: var(--deep-black);
+            font-weight: 700;
+            font-size: 0.8rem;
+            padding: 0.5rem 1.2rem;
+            border-radius: 50px;
+            transition: var(--transition);
+        }
+
+        nav a:hover { color: var(--primary-night-blue); }
+        nav a.active { background: var(--primary-night-blue); color: white; }
+        nav a.logout { color: #ef4444; }
+
+        main {
+            flex: 1;
+            padding: 0 3% 2rem;
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 1.5rem;
+        }
+
+        .column { display: flex; flex-direction: column; gap: 1rem; height: 100%; min-height: 0; }
+        .section-subtitle { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 1.5px; color: var(--muted-blue); margin-bottom: 0.5rem; font-weight: 800; }
+
+        .card {
+            background: var(--pure-white);
+            border-radius: 20px;
+            padding: 1.5rem;
+            box-shadow: 0 10px 30px -12px rgba(0, 0, 0, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .input-group { display: flex; flex-direction: column; gap: 0.4rem; }
+        .input-group label { font-weight: 800; font-size: 0.65rem; color: var(--muted-blue); text-transform: uppercase; }
+        input[type="text"], input[type="email"] { padding: 0.8rem; border-radius: 10px; border: 2px solid var(--bg-grey); outline: none; font-size: 0.85rem; }
+        input:focus { border-color: var(--primary-night-blue); }
+
+        .upload-area {
+            flex: 1;
+            border: 2px dashed var(--muted-blue);
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg-grey);
+            cursor: pointer;
+            padding: 1rem;
+            text-align: center;
+            transition: 0.3s;
+        }
+
+        .upload-area:hover { border-color: var(--primary-night-blue); background: rgba(30, 58, 138, 0.05); }
+        .upload-area span { font-weight: 700; font-size: 0.75rem; color: var(--muted-blue); margin-top: 5px; }
+
+        .btn-submit {
+            background: var(--deep-black);
+            color: white;
+            padding: 0.8rem;
+            border: none;
+            border-radius: 10px;
+            font-weight: 800;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .btn-submit:hover { background: var(--primary-night-blue); transform: translateY(-2px); }
+
+        .success-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(255, 255, 255, 0.95);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border-radius: 20px;
+            z-index: 5;
+        }
+
+        .failure-box {
+            border: 1px solid rgba(220, 38, 38, 0.25);
+            background: rgba(220, 38, 38, 0.07);
+            border-radius: 12px;
+            padding: 0.75rem;
+            display: none;
+        }
+
+        .mapped-box {
+            border: 1px solid rgba(22, 163, 74, 0.25);
+            background: rgba(22, 163, 74, 0.07);
+            border-radius: 12px;
+            padding: 0.75rem;
+            display: none;
+        }
+
+        .mapped-box h4 {
+            margin: 0;
+            font-size: 0.72rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: #166534;
+        }
+
+        .failure-box h4 {
+            margin: 0;
+            font-size: 0.72rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: #b91c1c;
+        }
+
+        .failure-list {
+            margin: 0.5rem 0 0;
+            padding-left: 1rem;
+            display: grid;
+            gap: 0.35rem;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+
+        .failure-list li {
+            font-size: 0.72rem;
+            color: #7f1d1d;
+            line-height: 1.4;
+        }
+
+        .success-icon {
+            width: 26px;
+            height: 26px;
+            margin-bottom: 0.5rem;
+            stroke-width: 2.2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            fill: none;
+        }
+
+        [data-theme="dark"] {
+            --dark-bg: #0d1110;
+            --dark-surface: #18201e;
+            --dark-surface-2: #24302d;
+            --dark-text: #f3f6f2;
+            --dark-muted: #b7c2bb;
+            --dark-accent: #2ec4b6;
+            --dark-highlight: #9fe870;
+            --dark-premium: #c9883d;
+            --primary-night-blue: var(--dark-accent);
+            --accent-blue: var(--dark-accent);
+            --primary-cyan: var(--dark-highlight);
+        }
+
+        [data-theme="dark"] body {
+            background-color: var(--dark-bg);
+            color: var(--dark-text);
+            background-image:
+                linear-gradient(rgba(46, 196, 182, 0.11) 1.5px, transparent 1.5px),
+                linear-gradient(90deg, rgba(201, 136, 61, 0.08) 1.5px, transparent 1.5px);
+        }
+
+        [data-theme="dark"] .logo,
+        [data-theme="dark"] nav a,
+        [data-theme="dark"] .card,
+        [data-theme="dark"] .section-subtitle,
+        [data-theme="dark"] .input-group label,
+        [data-theme="dark"] p,
+        [data-theme="dark"] .upload-area span,
+        [data-theme="dark"] input[type="text"],
+        [data-theme="dark"] input[type="email"] {
+            color: var(--dark-text);
+        }
+
+        [data-theme="dark"] .logo span {
+            color: var(--dark-accent);
+        }
+
+        [data-theme="dark"] nav {
+            background: rgba(22, 24, 32, 0.88);
+            border-color: rgba(46, 196, 182, 0.35);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+        }
+
+        [data-theme="dark"] nav a:hover {
+            color: var(--dark-accent);
+        }
+
+        [data-theme="dark"] nav a.active {
+            color: #072824;
+            box-shadow: 0 4px 15px rgba(46, 196, 182, 0.3);
+        }
+
+        [data-theme="dark"] .theme-toggle {
+            background: rgba(22, 24, 32, 0.94);
+            border-color: rgba(46, 196, 182, 0.35);
+            color: var(--dark-text);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+        }
+
+        [data-theme="dark"] .theme-toggle:hover {
+            border-color: var(--dark-premium);
+            background: rgba(201, 136, 61, 0.2);
+        }
+
+        [data-theme="dark"] .card {
+            background: rgba(26, 29, 38, 0.92);
+            border-color: rgba(46, 196, 182, 0.22);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
+        }
+
+        [data-theme="dark"] input[type="text"],
+        [data-theme="dark"] input[type="email"] {
+            background: #12151e;
+            border-color: #2f3645;
+        }
+
+        [data-theme="dark"] .upload-area {
+            background: var(--dark-surface-2);
+            border-color: rgba(46, 196, 182, 0.35);
+        }
+
+        [data-theme="dark"] .upload-area:hover {
+            border-color: var(--dark-accent);
+            background: rgba(46, 196, 182, 0.14);
+        }
+
+        [data-theme="dark"] .btn-submit {
+            background: var(--dark-accent);
+            color: #072824;
+        }
+
+        [data-theme="dark"] .btn-submit:hover {
+            background: #26aea1;
+            color: #072824;
+        }
+
+        [data-theme="dark"] .success-overlay {
+            background: rgba(26, 29, 38, 0.96);
+        }
+
+        [data-theme="dark"] .failure-box {
+            border-color: rgba(248, 113, 113, 0.35);
+            background: rgba(127, 29, 29, 0.22);
+        }
+
+        [data-theme="dark"] .mapped-box {
+            border-color: rgba(74, 222, 128, 0.35);
+            background: rgba(20, 83, 45, 0.22);
+        }
+
+        [data-theme="dark"] .mapped-box h4 {
+            color: #86efac;
+        }
+
+        [data-theme="dark"] .failure-box h4 {
+            color: #fca5a5;
+        }
+
+        [data-theme="dark"] .failure-list li {
+            color: #fecaca;
+        }
+
+        [data-theme="dark"] .mapped-box .failure-list li {
+            color: #bbf7d0;
+        }
+
+        [data-theme="dark"] #bulkUserSuccess .success-icon {
+            stroke: var(--dark-highlight);
+        }
+
+        [data-theme="dark"] #bulkUserSuccess p {
+            color: var(--dark-highlight) !important;
+        }
+
+        /* Animations */
+        @keyframes slideInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        .column { animation: slideInUp 0.6s ease-out both; }
+        .column:nth-child(2) { animation-delay: 0.1s; }
+        .column:nth-child(3) { animation-delay: 0.2s; }
+
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo">Dev<span>Élan.</span></div>
+        <div class="nav-wrapper">
+            <nav>
+                <a href="admin.html" class="active">Management</a>
+                <a href="form.html">Submissions</a>
+            </nav>
+            <nav>
+                <a href="#" class="logout" id="logoutLink">Logout</a>
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        <!-- Column 1: Single User Creation -->
+        <div class="column">
+            <span class="section-subtitle">Single User Provisioning</span>
+            <div class="card" style="flex: 1;">
+                <div class="input-group">
+                    <label>Full Name</label>
+                    <input type="text" id="singleFullName" placeholder="e.g. John Doe">
+                </div>
+                <div class="input-group">
+                    <label>Register Number</label>
+                    <input type="text" id="singleRegisterNo" placeholder="e.g. DEV2024001">
+                </div>
+                <div class="input-group">
+                    <label>Email ID</label>
+                    <input type="email" id="singleEmail" placeholder="user@university.edu">
+                </div>
+                <div class="input-group">
+                    <label>Assign Class</label>
+                    <input type="text" id="singleClass" placeholder="e.g. CSE-A">
+                </div>
+                <button class="btn-submit" id="createUserBtn" style="margin-top: auto;" onclick="createUser()">Create User</button>
+                <p id="singleUserMessage" style="font-size:0.75rem;font-weight:700;color:var(--muted-blue);"></p>
+            </div>
+        </div>
+
+        <!-- Column 2: Bulk User Creation -->
+        <div class="column">
+            <span class="section-subtitle">Bulk User Import</span>
+            <div class="card" style="flex: 1; position: relative;">
+                <p style="font-size: 0.75rem; color: var(--muted-blue);">Upload an Excel (.xlsx) or CSV file containing columns for Name, Register No, and Email.</p>
+                <div class="upload-area" onclick="document.getElementById('bulkUser').click()">
+                    <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="var(--muted-blue)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                    <span id="bulkUserText">Select Excel File</span>
+                    <input type="file" id="bulkUser" hidden accept=".xlsx, .csv" onchange="updateLabel('bulkUser', 'bulkUserText')">
+                </div>
+                <button class="btn-submit" id="bulkUploadBtn" onclick="processBulkUpload()">Process Bulk Upload</button>
+                <div class="success-overlay" id="bulkUserSuccess">
+                    <svg class="success-icon" viewBox="0 0 24 24" stroke="#1e7e34" aria-hidden="true">
+                        <path d="M20 6 9 17l-5-5"></path>
+                    </svg>
+                    <p id="bulkUserResult" style="font-weight: 800; font-size: 0.8rem; color: #1e7e34;">Users Created</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Column 3: Use Case Management -->
+        <div class="column">
+            <span class="section-subtitle">Use Case Management</span>
+            <div class="card" style="position: relative;">
+                <p style="font-size: 0.75rem; color: var(--muted-blue);">Upload a CSV to create or overwrite use cases. Recommended columns: ID/Code, Topic, Objective, Key Concepts, Output.</p>
+                <div class="upload-area" style="background: rgba(59, 130, 246, 0.08);" onclick="document.getElementById('usecaseCatalogFile').click()">
+                    <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="var(--primary-night-blue)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><polyline points="9 15 12 12 15 15"/></svg>
+                    <span id="usecaseCatalogText">Select Use Cases CSV</span>
+                    <input type="file" id="usecaseCatalogFile" hidden accept=".csv" onchange="updateLabel('usecaseCatalogFile', 'usecaseCatalogText')">
+                </div>
+                <button class="btn-submit" id="usecaseUploadBtn" onclick="importUseCases()">Upload Use Cases</button>
+                <div class="success-overlay" id="usecaseImportSuccess">
+                    <svg class="success-icon" viewBox="0 0 24 24" stroke="var(--primary-night-blue)" aria-hidden="true">
+                        <path d="M20 6 9 17l-5-5"></path>
+                    </svg>
+                    <p id="usecaseImportResult" style="font-weight: 800; font-size: 0.8rem; color: var(--primary-night-blue);">Use Cases Imported</p>
+                </div>
+            </div>
+            <div class="card" style="flex: 1; position: relative;">
+                <p style="font-size: 0.75rem; color: var(--muted-blue);">Assign specific Problem Statements to users by uploading a mapping Excel file.</p>
+                <div class="upload-area" style="background: rgba(46, 196, 182, 0.08);" onclick="document.getElementById('assignFile').click()">
+                    <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="var(--primary-night-blue)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+                    <span id="assignText">Select Assignment File</span>
+                    <input type="file" id="assignFile" hidden accept=".xlsx, .csv" onchange="updateLabel('assignFile', 'assignText')">
+                </div>
+                <button class="btn-submit" id="assignSyncBtn" onclick="syncAssignments()">Sync Assignments</button>
+                <div class="success-overlay" id="assignSuccess">
+                    <svg class="success-icon" viewBox="0 0 24 24" stroke="var(--primary-night-blue)" aria-hidden="true">
+                        <path d="M3 2v6h6"></path>
+                        <path d="M21 22v-6h-6"></path>
+                        <path d="M3 8a9 9 0 0 1 14.2-3.4L21 8"></path>
+                        <path d="M21 16a9 9 0 0 1-14.2 3.4L3 16"></path>
+                    </svg>
+                    <p id="assignResult" style="font-weight: 800; font-size: 0.8rem; color: var(--primary-night-blue);">Mapping Synced</p>
+                </div>
+                <div id="assignFailureBox" class="failure-box" aria-live="polite">
+                    <h4>Failed Assignments</h4>
+                    <ul id="assignFailureList" class="failure-list"></ul>
+                </div>
+                <div id="assignMappedBox" class="mapped-box" aria-live="polite">
+                    <h4>Mapped Assignments</h4>
+                    <ul id="assignMappedList" class="failure-list"></ul>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const logoutLink = document.getElementById('logoutLink');
+        const API_ROOTS = [
+            'http://127.0.0.1:8000/api/v1',
+            'http://localhost:8000/api/v1',
+        ];
+        let activeApiRoot = localStorage.getItem('devela-api-root') || API_ROOTS[0];
+        const AUTH_TOKEN_KEY = 'devela-access-token';
+        const AUTH_ROLE_KEY = 'devela-user-role';
+        const AUTH_USER_ID_KEY = 'devela-user-id';
+        const OVERLAY_HIDE_DELAY_MS = 5000;
+        const overlayHideTimers = {};
+
+        function getApiRoots() {
+            const merged = [activeApiRoot, ...API_ROOTS];
+            return merged.filter((value, index) => value && merged.indexOf(value) === index);
+        }
+
+        async function fetchWithFallback(path, options) {
+            let lastError = null;
+            const candidates = getApiRoots();
+
+            for (const candidate of candidates) {
+                try {
+                    const response = await fetch(`${candidate}${path}`, options);
+                    activeApiRoot = candidate;
+                    localStorage.setItem('devela-api-root', candidate);
+                    return response;
+                } catch (error) {
+                    lastError = error;
+                }
+            }
+
+            throw new Error(
+                `Unable to reach backend at ${candidates.join(' or ')}. Ensure the FastAPI server is running.`
+            );
+        }
+
+        function getToken() {
+            return localStorage.getItem(AUTH_TOKEN_KEY);
+        }
+
+        function clearSession() {
+            localStorage.removeItem(AUTH_TOKEN_KEY);
+            localStorage.removeItem(AUTH_ROLE_KEY);
+            localStorage.removeItem(AUTH_USER_ID_KEY);
+            window.location.href = 'index.html';
+        }
+
+        function setSingleUserMessage(message, isError = false) {
+            const target = document.getElementById('singleUserMessage');
+            target.textContent = message;
+            target.style.color = isError ? '#dc2626' : 'var(--muted-blue)';
+        }
+
+        async function apiFetch(path, options = {}) {
+            const token = getToken();
+            if (!token) {
+                clearSession();
+                throw new Error('Missing authentication token.');
+            }
+
+            const headers = {
+                ...(options.headers || {}),
+                Authorization: `Bearer ${token}`,
+            };
+
+            const response = await fetchWithFallback(path, {
+                ...options,
+                headers,
+            });
+
+            const payload = await response.json().catch(() => ({}));
+            if (response.status === 401) {
+                clearSession();
+                throw new Error('Session expired. Please log in again.');
+            }
+            if (!response.ok) {
+                throw new Error(payload.detail || 'Request failed.');
+            }
+            return payload;
+        }
+
+        function requireAdminSession() {
+            const role = localStorage.getItem(AUTH_ROLE_KEY);
+            if (role !== 'admin') {
+                window.location.href = 'index.html';
+            }
+        }
+
+        function setButtonState(buttonId, label, disabled) {
+            const button = document.getElementById(buttonId);
+            if (!button) {
+                return;
+            }
+            button.textContent = label;
+            button.disabled = disabled;
+        }
+
+        function updateLabel(inputId, labelId) {
+            const input = document.getElementById(inputId);
+            const label = document.getElementById(labelId);
+            if(input.files.length > 0) {
+                label.innerText = input.files[0].name;
+                label.style.color = 'var(--primary-night-blue)';
+            }
+        }
+
+        function revealOverlay(overlayId, textTargetId, message) {
+            const overlay = document.getElementById(overlayId);
+            const textTarget = document.getElementById(textTargetId);
+            if (textTarget && message) {
+                textTarget.textContent = message;
+            }
+            if (overlay) {
+                if (overlayHideTimers[overlayId]) {
+                    clearTimeout(overlayHideTimers[overlayId]);
+                }
+                overlay.style.display = 'flex';
+                overlayHideTimers[overlayId] = setTimeout(() => {
+                    overlay.style.display = 'none';
+                }, OVERLAY_HIDE_DELAY_MS);
+            }
+        }
+
+        function renderFailureList(boxId, listId, failures) {
+            const box = document.getElementById(boxId);
+            const list = document.getElementById(listId);
+            if (!box || !list) {
+                return;
+            }
+
+            list.innerHTML = '';
+            if (!Array.isArray(failures) || failures.length === 0) {
+                box.style.display = 'none';
+                return;
+            }
+
+            failures.forEach((failure) => {
+                const rowText = Number.isFinite(failure?.row) ? `Row ${failure.row}` : 'Row ?';
+                const identifier = failure?.identifier ? ` | ${failure.identifier}` : '';
+                const reason = failure?.reason || 'Unknown error';
+                const item = document.createElement('li');
+                item.textContent = `${rowText}${identifier}: ${reason}`;
+                list.appendChild(item);
+            });
+
+            box.style.display = 'block';
+        }
+
+        function renderMappedList(boxId, listId, identifiers) {
+            const box = document.getElementById(boxId);
+            const list = document.getElementById(listId);
+            if (!box || !list) {
+                return;
+            }
+
+            list.innerHTML = '';
+            if (!Array.isArray(identifiers) || identifiers.length === 0) {
+                box.style.display = 'none';
+                return;
+            }
+
+            identifiers.forEach((identifier) => {
+                const item = document.createElement('li');
+                item.textContent = identifier;
+                list.appendChild(item);
+            });
+
+            box.style.display = 'block';
+        }
+
+        async function createUser() {
+            const fullName = document.getElementById('singleFullName').value.trim();
+            const registerNo = document.getElementById('singleRegisterNo').value.trim();
+            const email = document.getElementById('singleEmail').value.trim();
+            const classAssign = document.getElementById('singleClass').value.trim();
+
+            if (!fullName || !registerNo || !email || !classAssign) {
+                setSingleUserMessage('Please fill all fields before creating a user.', true);
+                return;
+            }
+
+            setButtonState('createUserBtn', 'Creating...', true);
+            setSingleUserMessage('');
+
+            try {
+                const result = await apiFetch('/admin/users/create', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        full_name: fullName,
+                        register_no: registerNo,
+                        email,
+                        class_assign: classAssign,
+                    }),
+                });
+
+                if (!result.success) {
+                    setSingleUserMessage(result.message || 'User already exists.', true);
+                    return;
+                }
+
+                setSingleUserMessage(`User created. Temporary password: ${result.temp_password}`);
+            } catch (error) {
+                setSingleUserMessage(error.message || 'Unable to create user.', true);
+            } finally {
+                setButtonState('createUserBtn', 'Create User', false);
+            }
+        }
+
+        async function processBulkUpload() {
+            const fileInput = document.getElementById('bulkUser');
+            if (!fileInput.files.length) {
+                setSingleUserMessage('Please choose a CSV/XLSX file for bulk import.', true);
+                return;
+            }
+
+            setButtonState('bulkUploadBtn', 'Uploading...', true);
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+
+            try {
+                const result = await apiFetch('/admin/users/bulk-import', {
+                    method: 'POST',
+                    body: formData,
+                });
+                revealOverlay(
+                    'bulkUserSuccess',
+                    'bulkUserResult',
+                    `Imported ${result.imported_count} users${result.failures.length ? `, ${result.failures.length} failed` : ''}`
+                );
+            } catch (error) {
+                setSingleUserMessage(error.message || 'Bulk import failed.', true);
+            } finally {
+                setButtonState('bulkUploadBtn', 'Process Bulk Upload', false);
+            }
+        }
+
+        async function importUseCases() {
+            const fileInput = document.getElementById('usecaseCatalogFile');
+            if (!fileInput.files.length) {
+                setSingleUserMessage('Please choose a CSV file for use case import.', true);
+                return;
+            }
+
+            const selectedFile = fileInput.files[0];
+            if (!selectedFile.name.toLowerCase().endsWith('.csv')) {
+                setSingleUserMessage('Use case import supports only CSV files.', true);
+                return;
+            }
+
+            setButtonState('usecaseUploadBtn', 'Uploading...', true);
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+
+            try {
+                const result = await apiFetch('/admin/usecase/import', {
+                    method: 'POST',
+                    body: formData,
+                });
+                revealOverlay(
+                    'usecaseImportSuccess',
+                    'usecaseImportResult',
+                    `Created ${result.created_count}, updated ${result.updated_count}${result.failures.length ? `, ${result.failures.length} failed` : ''}`
+                );
+            } catch (error) {
+                setSingleUserMessage(error.message || 'Use case import failed.', true);
+            } finally {
+                setButtonState('usecaseUploadBtn', 'Upload Use Cases', false);
+            }
+        }
+
+        async function syncAssignments() {
+            const fileInput = document.getElementById('assignFile');
+            if (!fileInput.files.length) {
+                setSingleUserMessage('Please choose a mapping file for assignment sync.', true);
+                return;
+            }
+
+            setButtonState('assignSyncBtn', 'Syncing...', true);
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+
+            try {
+                const result = await apiFetch('/admin/usecase/assign', {
+                    method: 'POST',
+                    body: formData,
+                });
+                revealOverlay(
+                    'assignSuccess',
+                    'assignResult',
+                    `Mapped ${result.mapped_count} assignment(s)${result.failures.length ? `, ${result.failures.length} failed` : ''}`
+                );
+                renderFailureList('assignFailureBox', 'assignFailureList', result.failures);
+                renderMappedList('assignMappedBox', 'assignMappedList', result.mapped_identifiers);
+            } catch (error) {
+                renderFailureList('assignFailureBox', 'assignFailureList', []);
+                renderMappedList('assignMappedBox', 'assignMappedList', []);
+                setSingleUserMessage(error.message || 'Assignment sync failed.', true);
+            } finally {
+                setButtonState('assignSyncBtn', 'Sync Assignments', false);
+            }
+        }
+
+        async function handleLogout(event) {
+            event.preventDefault();
+            try {
+                await apiFetch('/auth/logout', { method: 'POST' });
+            } catch (_) {
+                // Ignore logout request errors.
+            } finally {
+                clearSession();
+            }
+        }
+
+        if (logoutLink) {
+            logoutLink.addEventListener('click', handleLogout);
+        }
+
+        requireAdminSession();
+    </script>
+</body>
+</html>
