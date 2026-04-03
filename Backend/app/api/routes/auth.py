@@ -31,7 +31,7 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse
         )
 
     access_token = create_access_token(subject=str(user.id), role=user.role.value)
-    redirect_url = "/admin.html" if user.role == UserRole.ADMIN else "/user_home.html"
+    redirect_url = "/admin" if user.role == UserRole.ADMIN else "/user-home"
 
     return TokenResponse(
         access_token=access_token,

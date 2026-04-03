@@ -377,8 +377,8 @@
         <div class="logo">Dev<span>Élan.</span></div>
         <div class="nav-wrapper">
             <nav>
-                <a href="admin.html">Management</a>
-                <a href="form.html" class="active">Submissions</a>
+                <a href="/admin">Management</a>
+                <a href="/submissions" class="active">Submissions</a>
             </nav>
             <nav>
                 <a href="#" class="logout" id="logoutLink">Logout</a>
@@ -479,13 +479,13 @@
             localStorage.removeItem(AUTH_TOKEN_KEY);
             localStorage.removeItem(AUTH_ROLE_KEY);
             localStorage.removeItem(AUTH_USER_ID_KEY);
-            window.location.href = 'index.html';
+            window.location.href = '/';
         }
 
         function requireAdminSession() {
             const role = localStorage.getItem(AUTH_ROLE_KEY);
             if (role !== 'admin') {
-                window.location.href = 'index.html';
+                window.location.href = '/';
             }
         }
 

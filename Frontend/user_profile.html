@@ -335,17 +335,17 @@
 <body>
 
     <header>
-        <div class="logo" onclick="window.location.href='index.html'">Dev<span>Élan.</span></div>
+        <div class="logo" onclick="window.location.href='/'">Dev<span>Élan.</span></div>
         <div class="nav-wrapper">
             <nav>
-                <a href="user_home.html">Home</a>
+                <a href="/user-home">Home</a>
                 <a href="#" class="locked">Leaderboard
                     <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
                         <rect x="4" y="11" width="16" height="10" rx="2"></rect>
                         <path d="M8 11V8a4 4 0 1 1 8 0v3"></path>
                     </svg>
                 </a>
-                <a href="user_profile.html" class="active">Profile</a>
+                <a href="/user-profile" class="active">Profile</a>
             </nav>
             <nav>
                 <a href="#" class="logout" id="logoutLink">Logout</a>
@@ -447,7 +447,7 @@
             localStorage.removeItem(AUTH_TOKEN_KEY);
             localStorage.removeItem(AUTH_ROLE_KEY);
             localStorage.removeItem(AUTH_USER_ID_KEY);
-            window.location.href = 'index.html';
+            window.location.href = '/';
         }
 
         function setMessage(text, isError = false) {

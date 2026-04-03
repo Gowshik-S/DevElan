@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
+from app.api.routes.pages import router as pages_router
 from app.api.router import api_router
 from app.core.config import settings
 from app.db.init_db import initialize_database
@@ -32,13 +33,7 @@ def create_app() -> FastAPI:
         initialize_database()
         ensure_upload_dir()
 
-    @app.get("/", tags=["Root"])
-    def read_root() -> dict[str, str]:
-        response = {"message": "DevEla FastAPI backend is running."}
-        if frontend_dir.exists():
-            response["frontend_url"] = "http://127.0.0.1:8000/frontend/index.html"
-        return response
-
+    app.include_router(pages_router)
     app.include_router(api_router, prefix="/api")
     if frontend_dir.exists():
         app.mount("/frontend", StaticFiles(directory=str(frontend_dir), html=True), name="frontend")

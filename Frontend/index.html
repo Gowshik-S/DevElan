@@ -838,9 +838,9 @@
 
         function resolveRedirectPath(rawPath) {
             if (!rawPath || typeof rawPath !== 'string') {
-                return 'user_home.html';
+                return '/user-home';
             }
-            return rawPath.startsWith('/') ? rawPath.slice(1) : rawPath;
+            return rawPath.startsWith('/') ? rawPath : `/${rawPath}`;
         }
 
         async function handleLogin(e) {

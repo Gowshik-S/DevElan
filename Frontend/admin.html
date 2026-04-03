@@ -400,8 +400,8 @@
         <div class="logo">Dev<span>Élan.</span></div>
         <div class="nav-wrapper">
             <nav>
-                <a href="admin.html" class="active">Management</a>
-                <a href="form.html">Submissions</a>
+                <a href="/admin" class="active">Management</a>
+                <a href="/submissions">Submissions</a>
             </nav>
             <nav>
                 <a href="#" class="logout" id="logoutLink">Logout</a>
@@ -548,7 +548,7 @@
             localStorage.removeItem(AUTH_TOKEN_KEY);
             localStorage.removeItem(AUTH_ROLE_KEY);
             localStorage.removeItem(AUTH_USER_ID_KEY);
-            window.location.href = 'index.html';
+            window.location.href = '/';
         }
 
         function setSingleUserMessage(message, isError = false) {
@@ -588,7 +588,7 @@
         function requireAdminSession() {
             const role = localStorage.getItem(AUTH_ROLE_KEY);
             if (role !== 'admin') {
-                window.location.href = 'index.html';
+                window.location.href = '/';
             }
         }
 
