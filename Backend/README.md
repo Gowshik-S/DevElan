@@ -42,7 +42,7 @@ Open these URLs:
 - Auth: `/api/v1/auth/login`, `/api/v1/auth/logout`
 - Profile: `/api/v1/profile/get`, `/api/v1/profile/update`
 - Use case: `/api/v1/usecase/list`, `/api/v1/usecase/get/{use_case_id}`
-- Student submission: `/api/v1/submission/repo-link`, `/api/v1/submission/video-upload`, `/api/v1/submission/get`
+- Student submission: `/api/v1/submission/repo-link`, `/api/v1/submission/video-upload` (meeting), `/api/v1/submission/demo-video-upload` (optional demo), `/api/v1/submission/get`
 - Admin submissions: `/api/v1/submissions/list`, `/api/v1/submissions/get/{submission_id}`, `/api/v1/submissions/update-status`
 - Admin tools: `/api/v1/admin/users/create`, `/api/v1/admin/users/bulk-import`, `/api/v1/admin/usecase/assign`
 - Video stream: `/api/v1/video/stream/{video_id}`

@@ -336,6 +336,14 @@
         .upload-box span { font-weight: 700; color: var(--muted-blue); font-size: 0.75rem; }
         .upload-box input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 
+        .upload-hint {
+            margin-top: 0.35rem;
+            font-size: 0.66rem;
+            font-weight: 700;
+            color: var(--muted-blue);
+            line-height: 1.35;
+        }
+
         .btn-submit {
             background: var(--deep-black);
             color: white;
@@ -558,6 +566,10 @@
             border-color: rgba(46, 196, 182, 0.35);
         }
 
+        [data-theme="dark"] .upload-hint {
+            color: var(--dark-muted);
+        }
+
         [data-theme="dark"] .btn-submit {
             background: var(--dark-accent);
             color: #072824;
@@ -625,7 +637,7 @@
         }
     </style>
 </head>
-<body>
+<body data-allowed-video-extensions="{{ (allowed_video_extensions | default(['.mp4', '.mov', '.mkv', '.webm', '.avi'])) | join(',') }}">
 
     <header>
         <div class="logo" onclick="window.location.href='/'">Dev<span>Élan.</span></div>
@@ -681,8 +693,10 @@
                 <div class="submitted-overlay" id="repoSuccess"><div class="checkmark-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg></div><div class="submitted-text">Linked</div></div>
             </div>
             <div class="submission-card" id="videoCard">
-                <div class="input-group" style="flex: 1; display: flex; flex-direction: column;"><label>Demo Recording</label><div class="upload-box"><span id="fileText">Select Recording</span><input type="file" id="videoUpload" title="Select demo recording" accept="video/*" onchange="updateFileName()"></div></div>
-                <button class="btn-submit" id="videoSubmitBtn" onclick="submitVideo()">Upload</button>
+                <div class="input-group" style="flex: 1; display: flex; flex-direction: column;"><label>Meeting Recording (Required)</label><div class="upload-box"><span id="fileText">Select Meeting Recording</span><input type="file" id="videoUpload" title="Select meeting recording" accept="video/*" onchange="updateFileName()"></div></div>
+                <p class="upload-hint">Accepted formats: {{ (allowed_video_extensions | default(['.mp4', '.mov', '.mkv', '.webm', '.avi'])) | join(', ') }} • Max {{ max_upload_size_mb | default(200) }} MB</p>
+                <p class="upload-hint">If upload hangs, check network stability and retry.</p>
+                <button class="btn-submit" id="videoSubmitBtn" onclick="submitVideo()">Upload Meeting Video</button>
                 <div class="upload-progress" id="videoUploadProgress" aria-live="polite">
                     <div class="upload-progress-track">
                         <div class="upload-progress-fill" id="videoUploadProgressFill"></div>
@@ -697,6 +711,13 @@
                 <p id="videoMessage" style="font-size:0.75rem;font-weight:700;color:var(--muted-blue);"></p>
                 <div class="submitted-overlay" id="videoSuccess"><div class="checkmark-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg></div><div class="submitted-text">Uploaded</div></div>
             </div>
+            <div class="submission-card" id="demoVideoCard">
+                <div class="input-group" style="flex: 1; display: flex; flex-direction: column;"><label>Demo Recording (Optional)</label><div class="upload-box"><span id="demoFileText">Select Demo Recording</span><input type="file" id="demoVideoUpload" title="Select demo recording" accept="video/*" onchange="updateDemoFileName()"></div></div>
+                <p class="upload-hint">Accepted formats: {{ (allowed_video_extensions | default(['.mp4', '.mov', '.mkv', '.webm', '.avi'])) | join(', ') }} • Max {{ max_upload_size_mb | default(200) }} MB</p>
+                <button class="btn-submit" id="demoVideoSubmitBtn" onclick="submitDemoVideo()">Upload Demo Video</button>
+                <p id="demoVideoMessage" style="font-size:0.75rem;font-weight:700;color:var(--muted-blue);"></p>
+                <div class="submitted-overlay" id="demoVideoSuccess"><div class="checkmark-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg></div><div class="submitted-text">Uploaded</div></div>
+            </div>
         </div>
     </main>
 
@@ -704,12 +725,32 @@
         const logoutLink = document.getElementById('logoutLink');
         const API_ROOTS = (() => {
             const candidates = [];
-            if (window.location && window.location.origin && window.location.origin !== 'null') {
-                candidates.push(`${window.location.origin}/api/v1`);
+            const origin = window.location && window.location.origin && window.location.origin !== 'null'
+                ? window.location.origin
+                : '';
+            const explicitApiRoot = String(window.DEVELA_API_ROOT || '').trim();
+            const normalizedExplicitApiRoot = explicitApiRoot ? explicitApiRoot.replace(/\/+$/, '') : '';
+            const isLocalOrigin = !origin
+                || origin.startsWith('http://localhost')
+                || origin.startsWith('http://127.0.0.1')
+                || origin.startsWith('https://localhost')
+                || origin.startsWith('https://127.0.0.1');
+
+            if (normalizedExplicitApiRoot) {
+                candidates.push(normalizedExplicitApiRoot);
             }
-            candidates.push('http://127.0.0.1:8000/api/v1');
-            candidates.push('http://localhost:8000/api/v1');
-            return candidates;
+
+            if (origin) {
+                candidates.push(`${origin}/api/v1`);
+            }
+
+            // Keep localhost fallbacks for local development only.
+            if (isLocalOrigin) {
+                candidates.push('http://127.0.0.1:8000/api/v1');
+                candidates.push('http://localhost:8000/api/v1');
+            }
+
+            return candidates.filter((value, index, list) => value && list.indexOf(value) === index);
         })();
         const storedApiRoot = localStorage.getItem('devela-api-root');
         let activeApiRoot = storedApiRoot && API_ROOTS.includes(storedApiRoot) ? storedApiRoot : API_ROOTS[0];
@@ -720,6 +761,19 @@
         const DEFAULT_MAX_VIDEO_SIZE_MB = 200;
         const MAX_VIDEO_SIZE_MB = Number('{{ max_upload_size_mb | default(200) }}') || DEFAULT_MAX_VIDEO_SIZE_MB;
         const MAX_VIDEO_SIZE_BYTES = MAX_VIDEO_SIZE_MB * 1024 * 1024;
+        const DEFAULT_ALLOWED_VIDEO_EXTENSIONS = ['.mp4', '.mov', '.mkv', '.webm', '.avi'];
+        const rawAllowedVideoExtensions = String(document.body?.dataset?.allowedVideoExtensions || '');
+        const ALLOWED_VIDEO_EXTENSIONS = (() => {
+            const fromTemplate = rawAllowedVideoExtensions
+                .split(',')
+                .map((value) => String(value).trim().toLowerCase())
+                .filter(Boolean);
+            if (fromTemplate.length === 0) {
+                return DEFAULT_ALLOWED_VIDEO_EXTENSIONS;
+            }
+            return fromTemplate;
+        })();
+        const ALLOWED_VIDEO_EXTENSIONS_LABEL = ALLOWED_VIDEO_EXTENSIONS.join(', ');
 
         const videoUploadProgress = document.getElementById('videoUploadProgress');
         const videoUploadProgressFill = document.getElementById('videoUploadProgressFill');
@@ -750,7 +804,7 @@
             }
 
             throw new Error(
-                `Unable to reach backend at ${candidates.join(' or ')}. Ensure the FastAPI server is running.`
+                `Unable to reach backend at ${candidates.join(' or ')}.`
             );
         }
 
@@ -788,13 +842,33 @@
                 throw new Error('Your session has expired. Please log in again.');
             }
             if (!response.ok) {
-                throw new Error(payload.detail || 'Request failed.');
+                throw new Error(payload.detail || `Request failed (${response.status}).`);
             }
             return payload;
         }
 
         function formatMegabytes(bytes) {
             return (bytes / (1024 * 1024)).toFixed(1);
+        }
+
+        function getFileExtension(fileName) {
+            const normalized = String(fileName || '').trim().toLowerCase();
+            const lastDotIndex = normalized.lastIndexOf('.');
+            if (lastDotIndex === -1) {
+                return '';
+            }
+            return normalized.slice(lastDotIndex);
+        }
+
+        function isAllowedVideoFile(file) {
+            if (!file || !file.name) {
+                return false;
+            }
+            return ALLOWED_VIDEO_EXTENSIONS.includes(getFileExtension(file.name));
+        }
+
+        function unsupportedVideoFormatMessage() {
+            return `Unsupported video format. Accepted formats: ${ALLOWED_VIDEO_EXTENSIONS_LABEL}.`;
         }
 
         function formatEta(seconds) {
@@ -912,6 +986,7 @@
 
                 xhr.open('POST', url, true);
                 xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                xhr.timeout = 10 * 60 * 1000;
                 if (uploadState) {
                     uploadState.xhr = xhr;
                 }
@@ -955,6 +1030,15 @@
                     reject(cancelledError);
                 };
 
+                xhr.ontimeout = () => {
+                    if (uploadState) {
+                        uploadState.xhr = null;
+                    }
+                    const timeoutError = new Error('Upload timed out. Check your network and retry.');
+                    timeoutError.isFinal = true;
+                    reject(timeoutError);
+                };
+
                 xhr.onload = () => {
                     if (uploadState) {
                         uploadState.xhr = null;
@@ -980,7 +1064,7 @@
                         return;
                     }
 
-                    const backendError = new Error(payload.detail || 'Request failed.');
+                    const backendError = new Error(payload.detail || `Request failed (${xhr.status}).`);
                     backendError.isHttpError = true;
                     reject(backendError);
                 };
@@ -1022,14 +1106,14 @@
                         if (uploadState.cancelled || (error && error.isCancelled)) {
                             throw error;
                         }
-                        if (error && error.isHttpError) {
+                        if (error && (error.isHttpError || error.isFinal)) {
                             throw error;
                         }
                     }
                 }
 
                 throw new Error(
-                    `Unable to reach backend at ${candidates.join(' or ')}. Ensure the FastAPI server is running.`
+                    `Unable to reach backend at ${candidates.join(' or ')}.`
                 );
             } finally {
                 activeVideoUploadState = null;
@@ -1102,8 +1186,10 @@
         function setSubmissionEnabled(enabled) {
             const gitInput = document.getElementById('gitUrl');
             const videoInput = document.getElementById('videoUpload');
+            const demoVideoInput = document.getElementById('demoVideoUpload');
             const repoButton = document.getElementById('repoSubmitBtn');
             const videoButton = document.getElementById('videoSubmitBtn');
+            const demoVideoButton = document.getElementById('demoVideoSubmitBtn');
 
             if (gitInput) {
                 gitInput.disabled = !enabled;
@@ -1111,11 +1197,17 @@
             if (videoInput) {
                 videoInput.disabled = !enabled;
             }
+            if (demoVideoInput) {
+                demoVideoInput.disabled = !enabled;
+            }
             if (repoButton) {
                 repoButton.disabled = !enabled;
             }
             if (videoButton) {
                 videoButton.disabled = !enabled;
+            }
+            if (demoVideoButton) {
+                demoVideoButton.disabled = !enabled;
             }
         }
 
@@ -1128,6 +1220,18 @@
             const current = result[0];
             if (current.repo_url) {
                 document.getElementById('gitUrl').value = current.repo_url;
+            }
+            const meetingVideoId = current.meeting_video_id || current.video_id;
+            const demoVideoId = current.demo_video_id;
+
+            if (meetingVideoId) {
+                document.getElementById('videoSuccess').style.display = 'flex';
+                setMessage('videoMessage', 'Meeting video already uploaded.');
+            }
+
+            if (demoVideoId) {
+                document.getElementById('demoVideoSuccess').style.display = 'flex';
+                setMessage('demoVideoMessage', 'Demo video already uploaded (optional).');
             }
             setMessage('repoMessage', `Current status: ${String(current.status || '').toUpperCase()}`);
         }
@@ -1177,12 +1281,46 @@
                 label.textContent = `File: ${fileName.length > 22 ? `${fileName.substring(0, 22)}...` : fileName}`;
                 label.style.color = 'var(--primary-night-blue)';
 
+                if (!isAllowedVideoFile(selectedFile)) {
+                    setMessage('videoMessage', unsupportedVideoFormatMessage(), true);
+                    return;
+                }
+
                 if (selectedFile.size > MAX_VIDEO_SIZE_BYTES) {
                     setMessage(
                         'videoMessage',
                         `Video file exceeds ${MAX_VIDEO_SIZE_MB} MB limit. Please choose a smaller file.`,
                         true
                     );
+                } else {
+                    setMessage('videoMessage', '');
+                }
+            }
+        }
+
+        function updateDemoFileName() {
+            const input = document.getElementById('demoVideoUpload');
+            const label = document.getElementById('demoFileText');
+
+            if (input.files.length > 0) {
+                const selectedFile = input.files[0];
+                const fileName = selectedFile.name;
+                label.textContent = `File: ${fileName.length > 22 ? `${fileName.substring(0, 22)}...` : fileName}`;
+                label.style.color = 'var(--primary-night-blue)';
+
+                if (!isAllowedVideoFile(selectedFile)) {
+                    setMessage('demoVideoMessage', unsupportedVideoFormatMessage(), true);
+                    return;
+                }
+
+                if (selectedFile.size > MAX_VIDEO_SIZE_BYTES) {
+                    setMessage(
+                        'demoVideoMessage',
+                        `Video file exceeds ${MAX_VIDEO_SIZE_MB} MB limit. Please choose a smaller file.`,
+                        true
+                    );
+                } else {
+                    setMessage('demoVideoMessage', '');
                 }
             }
         }
@@ -1226,11 +1364,16 @@
         async function submitVideo() {
             const input = document.getElementById('videoUpload');
             if (input.files.length === 0) {
-                setMessage('videoMessage', 'Please select a video file first.', true);
+                setMessage('videoMessage', 'Please select a meeting video file first.', true);
                 return;
             }
 
             const selectedFile = input.files[0];
+            if (!isAllowedVideoFile(selectedFile)) {
+                setMessage('videoMessage', unsupportedVideoFormatMessage(), true);
+                return;
+            }
+
             if (selectedFile.size > MAX_VIDEO_SIZE_BYTES) {
                 setMessage(
                     'videoMessage',
@@ -1273,13 +1416,64 @@
                 markVideoUploadCompleted();
                 await new Promise((resolve) => setTimeout(resolve, 850));
                 document.getElementById('videoSuccess').style.display = 'flex';
-                setMessage('videoMessage', 'Video uploaded successfully.');
+                setMessage('videoMessage', 'Meeting video uploaded successfully.');
             } catch (error) {
                 hideVideoUploadProgress();
-                setMessage('videoMessage', error.message || 'Could not upload video.', true);
+                setMessage('videoMessage', error.message || 'Could not upload meeting video.', true);
             } finally {
                 hideVideoUploadCancel();
-                button.textContent = 'Upload';
+                button.textContent = 'Upload Meeting Video';
+                button.disabled = false;
+            }
+        }
+
+        async function submitDemoVideo() {
+            const input = document.getElementById('demoVideoUpload');
+            if (input.files.length === 0) {
+                setMessage('demoVideoMessage', 'Please select a demo video file first.', true);
+                return;
+            }
+
+            const selectedFile = input.files[0];
+            if (!isAllowedVideoFile(selectedFile)) {
+                setMessage('demoVideoMessage', unsupportedVideoFormatMessage(), true);
+                return;
+            }
+
+            if (selectedFile.size > MAX_VIDEO_SIZE_BYTES) {
+                setMessage(
+                    'demoVideoMessage',
+                    `Video file exceeds ${MAX_VIDEO_SIZE_MB} MB limit. Please choose a smaller file.`,
+                    true
+                );
+                return;
+            }
+
+            if (!activeUseCaseId) {
+                setMessage('demoVideoMessage', 'No task assigned yet. Stay ready — your next challenge is coming.', true);
+                return;
+            }
+
+            const button = document.getElementById('demoVideoSubmitBtn');
+            button.textContent = 'Uploading...';
+            button.disabled = true;
+            document.getElementById('demoVideoSuccess').style.display = 'none';
+
+            const formData = new FormData();
+            formData.append('use_case_id', String(activeUseCaseId));
+            formData.append('video_file', selectedFile);
+
+            try {
+                await apiFetch('/submission/demo-video-upload', {
+                    method: 'POST',
+                    body: formData,
+                });
+                document.getElementById('demoVideoSuccess').style.display = 'flex';
+                setMessage('demoVideoMessage', 'Demo video uploaded successfully (optional).');
+            } catch (error) {
+                setMessage('demoVideoMessage', error.message || 'Could not upload demo video.', true);
+            } finally {
+                button.textContent = 'Upload Demo Video';
                 button.disabled = false;
             }
         }

@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
@@ -18,12 +20,37 @@ from app.schemas.submission import (
 router = APIRouter(prefix="/submissions", tags=["Submissions"])
 
 
-def _build_submission_item(db: Session, submission: Submission) -> SubmissionListItem:
-    latest_asset = db.scalar(
+DEMO_VIDEO_PREFIX = "demo_"
+
+
+def _is_demo_video_asset(asset: VideoAsset) -> bool:
+    return Path(asset.stored_path).name.lower().startswith(DEMO_VIDEO_PREFIX)
+
+
+def _get_submission_video_assets(db: Session, submission_id: int) -> tuple[VideoAsset | None, VideoAsset | None]:
+    assets = db.scalars(
         select(VideoAsset)
-        .where(VideoAsset.submission_id == submission.id)
+        .where(VideoAsset.submission_id == submission_id)
         .order_by(VideoAsset.created_at.desc())
-    )
+    ).all()
+
+    meeting_asset: VideoAsset | None = None
+    demo_asset: VideoAsset | None = None
+    for asset in assets:
+        if _is_demo_video_asset(asset):
+            if demo_asset is None:
+                demo_asset = asset
+        elif meeting_asset is None:
+            meeting_asset = asset
+
+        if meeting_asset and demo_asset:
+            break
+
+    return meeting_asset, demo_asset
+
+
+def _build_submission_item(db: Session, submission: Submission) -> SubmissionListItem:
+    meeting_asset, demo_asset = _get_submission_video_assets(db, submission.id)
 
     return SubmissionListItem(
         submission_id=submission.id,
@@ -31,7 +58,9 @@ def _build_submission_item(db: Session, submission: Submission) -> SubmissionLis
         register_no=submission.user.register_no,
         project_title=submission.usecase.title,
         repo_link=submission.repo_url,
-        video_id=latest_asset.id if latest_asset else None,
+        video_id=meeting_asset.id if meeting_asset else None,
+        meeting_video_id=meeting_asset.id if meeting_asset else None,
+        demo_video_id=demo_asset.id if demo_asset else None,
         status=submission.status,
     )
 

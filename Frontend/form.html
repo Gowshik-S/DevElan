@@ -129,7 +129,7 @@
 
         .table-header {
             display: grid;
-            grid-template-columns: 1.2fr 1fr 1.5fr 1fr 0.8fr;
+            grid-template-columns: 1.2fr 1fr 1.5fr 1fr 1fr 0.8fr;
             padding: 1.2rem 2rem;
             background: var(--deep-black);
             color: white;
@@ -148,7 +148,7 @@
 
         .row {
             display: grid;
-            grid-template-columns: 1.2fr 1fr 1.5fr 1fr 0.8fr;
+            grid-template-columns: 1.2fr 1fr 1.5fr 1fr 1fr 0.8fr;
             padding: 1.2rem 2rem;
             border-bottom: 1px solid var(--bg-grey);
             align-items: center;
@@ -397,7 +397,8 @@
                 <div>User Name</div>
                 <div>Reg No</div>
                 <div>Project / Repo</div>
-                <div>Evaluation Video</div>
+                <div>Meeting Video</div>
+                <div>Demo Video</div>
                 <div>Status</div>
             </div>
             <div class="table-body" id="tableBody">
@@ -437,12 +438,32 @@
         const tableBody = document.getElementById('tableBody');
         const API_ROOTS = (() => {
             const candidates = [];
-            if (window.location && window.location.origin && window.location.origin !== 'null') {
-                candidates.push(`${window.location.origin}/api/v1`);
+            const origin = window.location && window.location.origin && window.location.origin !== 'null'
+                ? window.location.origin
+                : '';
+            const explicitApiRoot = String(window.DEVELA_API_ROOT || '').trim();
+            const normalizedExplicitApiRoot = explicitApiRoot ? explicitApiRoot.replace(/\/+$/, '') : '';
+            const isLocalOrigin = !origin
+                || origin.startsWith('http://localhost')
+                || origin.startsWith('http://127.0.0.1')
+                || origin.startsWith('https://localhost')
+                || origin.startsWith('https://127.0.0.1');
+
+            if (normalizedExplicitApiRoot) {
+                candidates.push(normalizedExplicitApiRoot);
             }
-            candidates.push('http://127.0.0.1:8000/api/v1');
-            candidates.push('http://localhost:8000/api/v1');
-            return candidates;
+
+            if (origin) {
+                candidates.push(`${origin}/api/v1`);
+            }
+
+            // Keep localhost fallbacks for local development only.
+            if (isLocalOrigin) {
+                candidates.push('http://127.0.0.1:8000/api/v1');
+                candidates.push('http://localhost:8000/api/v1');
+            }
+
+            return candidates.filter((value, index, list) => value && list.indexOf(value) === index);
         })();
         const storedApiRoot = localStorage.getItem('devela-api-root');
         let activeApiRoot = storedApiRoot && API_ROOTS.includes(storedApiRoot) ? storedApiRoot : API_ROOTS[0];
@@ -473,7 +494,7 @@
             }
 
             throw new Error(
-                `Unable to reach backend at ${candidates.join(' or ')}. Ensure the FastAPI server is running.`
+                `Unable to reach backend at ${candidates.join(' or ')}.`
             );
         }
 
@@ -516,7 +537,7 @@
                 throw new Error('Session expired. Please log in again.');
             }
             if (!response.ok) {
-                throw new Error(payload.detail || 'Request failed.');
+                throw new Error(payload.detail || `Request failed (${response.status}).`);
             }
             return payload;
         }
@@ -585,21 +606,39 @@
                     repoCell.textContent = '-- No Repo Yet --';
                 }
 
-                const videoCell = document.createElement('div');
-                if (item.video_id) {
+                const meetingVideoCell = document.createElement('div');
+                const meetingVideoId = item.meeting_video_id || item.video_id;
+                if (meetingVideoId) {
                     const watchButton = document.createElement('button');
                     watchButton.className = 'btn-watch';
                     watchButton.type = 'button';
-                    watchButton.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>Watch Video';
+                    watchButton.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>Watch Meeting';
                     watchButton.addEventListener('click', () => {
-                        openVideo(item.video_id, item.user_name, item.project_title);
+                        openVideo(meetingVideoId, item.user_name, item.project_title);
                     });
-                    videoCell.appendChild(watchButton);
+                    meetingVideoCell.appendChild(watchButton);
                 } else {
                     const noVideoTag = document.createElement('span');
                     noVideoTag.className = 'tag-status status-disabled';
                     noVideoTag.textContent = 'No Video';
-                    videoCell.appendChild(noVideoTag);
+                    meetingVideoCell.appendChild(noVideoTag);
+                }
+
+                const demoVideoCell = document.createElement('div');
+                if (item.demo_video_id) {
+                    const demoWatchButton = document.createElement('button');
+                    demoWatchButton.className = 'btn-watch';
+                    demoWatchButton.type = 'button';
+                    demoWatchButton.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>Watch Demo';
+                    demoWatchButton.addEventListener('click', () => {
+                        openVideo(item.demo_video_id, item.user_name, item.project_title);
+                    });
+                    demoVideoCell.appendChild(demoWatchButton);
+                } else {
+                    const optionalTag = document.createElement('span');
+                    optionalTag.className = 'tag-status status-disabled';
+                    optionalTag.textContent = 'Optional';
+                    demoVideoCell.appendChild(optionalTag);
                 }
 
                 const statusCell = document.createElement('div');
@@ -611,7 +650,8 @@
                 row.appendChild(userCell);
                 row.appendChild(regCell);
                 row.appendChild(repoCell);
-                row.appendChild(videoCell);
+                row.appendChild(meetingVideoCell);
+                row.appendChild(demoVideoCell);
                 row.appendChild(statusCell);
 
                 tableBody.appendChild(row);

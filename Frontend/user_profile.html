@@ -407,12 +407,32 @@
         const profileMessage = document.getElementById('profileMessage');
         const API_ROOTS = (() => {
             const candidates = [];
-            if (window.location && window.location.origin && window.location.origin !== 'null') {
-                candidates.push(`${window.location.origin}/api/v1`);
+            const origin = window.location && window.location.origin && window.location.origin !== 'null'
+                ? window.location.origin
+                : '';
+            const explicitApiRoot = String(window.DEVELA_API_ROOT || '').trim();
+            const normalizedExplicitApiRoot = explicitApiRoot ? explicitApiRoot.replace(/\/+$/, '') : '';
+            const isLocalOrigin = !origin
+                || origin.startsWith('http://localhost')
+                || origin.startsWith('http://127.0.0.1')
+                || origin.startsWith('https://localhost')
+                || origin.startsWith('https://127.0.0.1');
+
+            if (normalizedExplicitApiRoot) {
+                candidates.push(normalizedExplicitApiRoot);
             }
-            candidates.push('http://127.0.0.1:8000/api/v1');
-            candidates.push('http://localhost:8000/api/v1');
-            return candidates;
+
+            if (origin) {
+                candidates.push(`${origin}/api/v1`);
+            }
+
+            // Keep localhost fallbacks for local development only.
+            if (isLocalOrigin) {
+                candidates.push('http://127.0.0.1:8000/api/v1');
+                candidates.push('http://localhost:8000/api/v1');
+            }
+
+            return candidates.filter((value, index, list) => value && list.indexOf(value) === index);
         })();
         const storedApiRoot = localStorage.getItem('devela-api-root');
         let activeApiRoot = storedApiRoot && API_ROOTS.includes(storedApiRoot) ? storedApiRoot : API_ROOTS[0];
@@ -441,7 +461,7 @@
             }
 
             throw new Error(
-                `Unable to reach backend at ${candidates.join(' or ')}. Ensure the FastAPI server is running.`
+                `Unable to reach backend at ${candidates.join(' or ')}.`
             );
         }
 
@@ -499,7 +519,7 @@
                 throw new Error('Session expired. Please log in again.');
             }
             if (!response.ok) {
-                throw new Error(payload.detail || 'Request failed.');
+                throw new Error(payload.detail || `Request failed (${response.status}).`);
             }
             return payload;
         }

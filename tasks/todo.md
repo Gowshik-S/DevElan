@@ -171,3 +171,57 @@
 - Updated `/admin/usecase/assign` creation path to fail with actionable error when code is missing from catalog and row lacks title/objective.
 - Added code normalization for numeric/variant formats (`53`, `53.0`, `EL53`, `EL-53`) to prevent mismatches.
 - Expanded CSV alias support for common header variants (`THE OBJECTIVE`, `problem_id`, `problem_number`, `expected_output`, `id`) in both import and assignment sync paths.
+
+## Video Role Refactor Plan (2026-04-05)
+
+- [x] Add backend meeting/demo asset classification without DB migration
+- [x] Keep backward compatibility by mapping legacy `video_id` to meeting video
+- [x] Add optional demo upload API while keeping meeting upload mandatory for completion
+- [x] Update student page with separate meeting and demo upload sections
+- [x] Update admin submissions page to show/watch meeting and demo videos independently
+- [x] Run route and UI smoke checks; record implementation review
+
+### Video Role Refactor Review (2026-04-05)
+
+- Reworked submission video selection to classify by stored filename prefix (`demo_`) so all legacy uploads remain meeting videos by default.
+- Added `POST /api/v1/submission/demo-video-upload` and kept existing `POST /api/v1/submission/video-upload` as meeting upload.
+- Updated student/admin response schemas with `meeting_video_id` and `demo_video_id` while preserving `video_id` as meeting-compatible legacy field.
+- Updated student UI with mandatory meeting upload and optional demo upload card; status remains completion-safe only when meeting is present.
+- Updated admin submissions table to show separate Watch controls for meeting and demo videos.
+- Verified with an end-to-end TestClient smoke script: demo-only keeps status `in-progress`; meeting upload transitions to `submitted`; admin/student payload IDs align.
+
+## Downtime Page Plan (2026-04-05)
+
+- [x] Design minimalist animated downtime layout aligned with existing DevElan styles
+- [x] Create `Frontend/downtime.html` with responsive and reduced-motion support
+- [x] Keep page standalone with no backend route integration
+- [x] Validate route render and basic page behavior
+- [x] Add implementation review notes
+
+### Downtime Page Review (2026-04-05)
+
+- Added a new minimalist animated maintenance page at `Frontend/downtime.html` using the existing DevElan visual system (grid background, glass card, blue/cyan accents, light-only mode).
+- Implemented restrained motion with three purposeful animations: grid drift, ambient shape float, and status pulse.
+- Added accessibility support with `prefers-reduced-motion` handling and clear readable countdown typography.
+- Updated page to show only `Under Maintenance` with ETA `20 min` and a live countdown timer.
+- Removed backend-dependent links and retained the page as a separate static hostable artifact.
+
+## Upload Resilience Research Plan (2026-04-05)
+
+- [x] Boot scan: checked docs folder (missing), tasks notes, code paths, and diagnostics
+- [x] Web best practices: resumable/chunked strategy patterns used across large providers
+- [x] Web pitfalls/failure analysis: duplicates, stale sessions, integrity drift, retry storms
+- [x] Web alternatives/tradeoffs: custom chunks vs tus vs direct-to-object-storage multipart
+- [x] Docs/code cross-reference: map recommendations to current FastAPI + vanilla JS implementation
+- [x] Security/performance audit: auth, integrity checks, storage pressure, and timeout behavior
+
+### Upload Resilience Bottleneck Hypothesis
+
+- Current bottleneck is one-shot multipart upload to app server; any mid-stream interruption restarts from byte zero and increases user drop-off on unstable networks.
+
+### Upload Resilience Findings Summary
+
+- Current implementation confirms one-shot XHR upload to `/api/v1/submission/video-upload` with frontend progress only, but no resumable upload session, no offset reconciliation, and no chunk commit protocol.
+- Highest-confidence near-term path is a phased rollout: immediate retry/idempotency hardening on current API, then custom chunked sessions or tus, then direct-to-object-storage multipart at scale.
+- Core reliability controls identified: per-upload idempotency key, server-tracked upload session with offset/status endpoint, chunk checksum verification, retry with exponential backoff + jitter, and explicit session expiration/garbage collection.
+- Operational risk hotspots to control early: duplicate submission rows/assets, orphaned temp parts, stale session takeover, and integrity mismatches between client-side file metadata and committed object bytes.

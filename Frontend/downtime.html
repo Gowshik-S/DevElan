@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DevElan - Under Maintenance</title>
+    <style>
+        :root {
+            --primary-night-blue: #1e3a8a;
+            --accent-blue: #3b82f6;
+            --primary-cyan: #00d4ff;
+            --deep-black: #161311;
+            --muted-blue: #546877;
+            --bg-grey: #e2e8f0;
+            --pure-white: #ffffff;
+            --transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', -apple-system, system-ui, sans-serif;
+        }
+
+        body {
+            min-height: 100vh;
+            overflow: hidden;
+            color: var(--deep-black);
+            background: var(--bg-grey);
+            display: grid;
+            place-items: center;
+            padding: 1rem;
+        }
+
+        .bg-grid {
+            position: fixed;
+            inset: 0;
+            z-index: -3;
+            background-image:
+                linear-gradient(rgba(0, 212, 255, 0.14) 1.5px, transparent 1.5px),
+                linear-gradient(90deg, rgba(0, 212, 255, 0.14) 1.5px, transparent 1.5px);
+            background-size: 52px 52px;
+            animation: gridDrift 28s linear infinite;
+        }
+
+        .ambient-shape {
+            position: fixed;
+            width: 520px;
+            height: 520px;
+            top: 12%;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: -2;
+            pointer-events: none;
+            border-radius: 46% 54% 58% 42% / 49% 48% 52% 51%;
+            background: radial-gradient(circle at 30% 25%, rgba(59, 130, 246, 0.25), rgba(0, 212, 255, 0.08) 45%, rgba(30, 58, 138, 0.02) 70%);
+            filter: blur(2px);
+            animation: shapeFloat 10s ease-in-out infinite;
+        }
+
+        .status-card {
+            width: min(100%, 620px);
+            padding: 2rem;
+            border-radius: 28px;
+            background: rgba(255, 255, 255, 0.78);
+            border: 1px solid rgba(255, 255, 255, 0.65);
+            -webkit-backdrop-filter: blur(14px);
+            backdrop-filter: blur(14px);
+            box-shadow: 0 24px 60px rgba(22, 19, 17, 0.12);
+            animation: cardEnter 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+            text-align: center;
+        }
+
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.4rem 0.75rem;
+            border-radius: 999px;
+            border: 1px solid rgba(30, 58, 138, 0.2);
+            background: rgba(30, 58, 138, 0.1);
+            color: var(--primary-night-blue);
+            font-size: 0.72rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+            margin-bottom: 1rem;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 999px;
+            background: var(--accent-blue);
+            animation: statusPulse 2.9s ease-in-out infinite;
+        }
+
+        h1 {
+            font-size: clamp(2rem, 5vw, 2.9rem);
+            line-height: 1.03;
+            letter-spacing: -1.5px;
+            margin-bottom: 0.9rem;
+        }
+
+        .subtitle {
+            color: var(--muted-blue);
+            line-height: 1.55;
+            font-size: 1rem;
+            margin-bottom: 1.2rem;
+        }
+
+        .eta-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            margin-bottom: 0.9rem;
+            padding: 0.55rem 0.9rem;
+            border-radius: 11px;
+            background: rgba(0, 212, 255, 0.12);
+            border: 1px solid rgba(30, 58, 138, 0.2);
+            font-size: 0.86rem;
+            font-weight: 700;
+            color: var(--deep-black);
+        }
+
+        .countdown {
+            font-size: clamp(2rem, 9vw, 3.6rem);
+            font-weight: 900;
+            letter-spacing: 2px;
+            color: var(--primary-night-blue);
+            margin-bottom: 0.2rem;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .countdown-note {
+            font-size: 0.78rem;
+            color: var(--muted-blue);
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        @media (max-width: 768px) {
+            .ambient-shape {
+                width: 360px;
+                height: 360px;
+                top: 14%;
+            }
+
+            .status-card {
+                border-radius: 22px;
+                padding: 1.2rem;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.001ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.001ms !important;
+                scroll-behavior: auto !important;
+            }
+        }
+
+        @keyframes statusPulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.08); opacity: 0.7; }
+        }
+
+        @keyframes gridDrift {
+            0% { background-position: 0 0, 0 0; }
+            100% { background-position: 52px 52px, -52px 52px; }
+        }
+
+        @keyframes shapeFloat {
+            0%, 100% { transform: translateX(-50%) translateY(0) rotate(0deg); }
+            50% { transform: translateX(-50%) translateY(-8px) rotate(2deg); }
+        }
+
+        @keyframes cardEnter {
+            0% { opacity: 0; transform: translateY(8px) scale(0.985); }
+            100% { opacity: 1; transform: translateY(0) scale(1); }
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-grid" aria-hidden="true"></div>
+    <div class="ambient-shape" aria-hidden="true"></div>
+
+    <main>
+        <section class="status-card" aria-live="polite" aria-labelledby="maintenanceTitle">
+            <p class="status-pill"><span class="status-dot" aria-hidden="true"></span>Service Status</p>
+            <h1 id="maintenanceTitle">Under Maintenance</h1>
+            <p class="subtitle">We are applying updates right now. Please check back in a few minutes.</p>
+            <p class="eta-chip">ETA: 20 min</p>
+            <p class="countdown" id="countdown">20:00</p>
+            <p class="countdown-note" id="countdownNote">Live countdown</p>
+        </section>
+    </main>
+
+    <script>
+        const countdownElement = document.getElementById('countdown');
+        const countdownNoteElement = document.getElementById('countdownNote');
+        const initialSeconds = 20 * 60;
+        let remainingSeconds = initialSeconds;
+
+        function formatCountdown(totalSeconds) {
+            const minutes = Math.floor(totalSeconds / 60);
+            const seconds = totalSeconds % 60;
+            return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        }
+
+        function renderCountdown() {
+            countdownElement.textContent = formatCountdown(remainingSeconds);
+            if (remainingSeconds <= 0) {
+                countdownNoteElement.textContent = 'Maintenance should be finishing now';
+            }
+        }
+
+        renderCountdown();
+
+        const timerId = window.setInterval(() => {
+            remainingSeconds = Math.max(remainingSeconds - 1, 0);
+            renderCountdown();
+
+            if (remainingSeconds === 0) {
+                window.clearInterval(timerId);
+            }
+        }, 1000);
+    </script>
+</body>
+</html>

@@ -19,7 +19,7 @@ def _sanitize_filename(file_name: str) -> str:
     return Path(file_name).name.replace(" ", "_")
 
 
-def save_uploaded_video(file: UploadFile) -> tuple[str, str, int]:
+def save_uploaded_video(file: UploadFile, stored_name_prefix: str = "") -> tuple[str, str, int]:
     if not file.filename:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -35,7 +35,8 @@ def save_uploaded_video(file: UploadFile) -> tuple[str, str, int]:
         )
 
     upload_dir = ensure_upload_dir()
-    stored_name = f"{uuid4().hex}{suffix}"
+    normalized_prefix = stored_name_prefix.strip()
+    stored_name = f"{normalized_prefix}{uuid4().hex}{suffix}"
     destination = upload_dir / stored_name
     max_size_bytes = settings.max_upload_size_mb * 1024 * 1024
 

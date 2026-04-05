@@ -76,7 +76,15 @@
 - 2026-04-03: Applied Version B (Emerald Copper) across all Frontend pages with constrained accent mapping.
 - 2026-04-03: Brainstormed darker developer-first palette variants emphasizing deeper backgrounds and restrained accents.
 - 2026-04-03: Recommended adding a fourth admin action card for Use Cases CSV upload in the Use Case column (before assignment in mobile flow), with explicit helper text for required columns: Topic, Objective, Key Concepts, Output.
+- 2026-04-05: Drafted implementation-ready downtime/maintenance page design spec aligned to current DevElan visual language (light grid, rounded glass card, deep navy/cyan + dark mode emerald-copper tokens, restrained ambient motion, single CTA).
 
 ## Export History
 - 2026-04-02: Exported direct HTML/CSS updates across Frontend pages (no separate token file yet).
 - 2026-04-03: Applied Version B tokens and dark-mode accent rules in index/admin/form/user_home/user_profile.
+
+## Downtime/Maintenance Page Spec
+- Layout concept: center-focused single card over ambient grid with one supporting decorative shape layer; no secondary panels.
+- Content hierarchy: status label -> H1 outage/maintenance message -> one-sentence clarification -> optional ETA/info chip -> one primary CTA.
+- Token mapping: light mode uses #1E3A8A and #00D4FF accents over #E2E8F0/#FFFFFF surfaces; dark mode uses #2EC4B6 CTA accent, #9FE870 status/success, #C9883D optional premium divider or chip edge on #0D1110/#18201E surfaces.
+- Motion profile: three low-amplitude ambient animations only (status pulse, slow grid drift, shape float) with reduced-motion fallback to near-static.
+- Accessibility guardrails: maintain WCAG AA contrast (4.5:1 text, 3:1 UI components), keep focus-visible states high-contrast, avoid flashing/rapid movement.

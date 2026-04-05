@@ -18,6 +18,7 @@ class RepoLinkSubmissionResponse(BaseModel):
 class VideoUploadResponse(BaseModel):
     success: bool
     video_id: int
+    video_type: str | None = None
     status: SubmissionStatus
     message: str
 
@@ -29,6 +30,8 @@ class SubmissionDetail(BaseModel):
     project_title: str
     repo_url: str | None = None
     video_id: int | None = None
+    meeting_video_id: int | None = None
+    demo_video_id: int | None = None
     status: SubmissionStatus
 
 
@@ -39,6 +42,8 @@ class SubmissionListItem(BaseModel):
     project_title: str
     repo_link: str | None = None
     video_id: int | None = None
+    meeting_video_id: int | None = None
+    demo_video_id: int | None = None
     status: SubmissionStatus
 
 
