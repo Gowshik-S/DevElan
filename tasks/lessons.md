@@ -20,3 +20,5 @@
 - Chunk sizes that are too small improve reliability but can heavily reduce throughput on higher-latency tunnels; use adaptive chunk growth on success and adaptive downshift on failure.
 - Persistent success overlays on upload cards can accidentally block future replacement uploads; keep overlays temporary and preserve explicit replace controls.
 - When meeting and demo uploads share backend mechanics, keep telemetry UX parity (progress %, speed, ETA) across both to avoid feature drift.
+- Keep evaluator metadata separate from upload/progress status: store admin decision (`accepted/rejected`) and feedback in a dedicated evaluation record so student submission lifecycle states remain stable.
+- For admin dashboards with many columns, avoid fixed-width-only grids; add a horizontal scroll wrapper and responsive header/nav wrapping to preserve alignment on laptop and mobile widths.

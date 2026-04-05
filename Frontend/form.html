@@ -37,7 +37,7 @@
         .logo { font-size: 1.8rem; font-weight: 900; letter-spacing: -1px; color: var(--deep-black); cursor: pointer; }
         .logo span { color: var(--primary-night-blue); }
         
-        .nav-wrapper { display: flex; gap: 1rem; pointer-events: auto; }
+        .nav-wrapper { display: flex; gap: 1rem; pointer-events: auto; align-items: center; }
 
         .theme-toggle {
             width: 40px;
@@ -91,10 +91,28 @@
         nav a.active { background: var(--primary-night-blue); color: white; }
         nav a.logout { color: #ef4444; }
 
-        main { flex: 1; padding: 0 5% 2rem; display: flex; flex-direction: column; gap: 1rem; min-height: 0; }
+        main {
+            flex: 1;
+            width: min(1520px, 100%);
+            margin: 0 auto;
+            padding: 0 clamp(1rem, 2.5vw, 2rem) 2rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            min-height: 0;
+        }
         
-        .search-container {
+        .toolbar-row {
             width: 100%;
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
+            flex-wrap: wrap;
+        }
+
+        .search-container {
+            flex: 1;
+            min-width: 260px;
             background: var(--pure-white);
             padding: 0.8rem 1.5rem;
             border-radius: 100px;
@@ -104,6 +122,43 @@
             box-shadow: 0 10px 25px rgba(0,0,0,0.05);
             border: 1px solid rgba(30, 58, 138, 0.1);
             flex-shrink: 0;
+        }
+
+        .sort-container {
+            display: flex;
+            align-items: center;
+            gap: 0.45rem;
+            background: var(--pure-white);
+            border: 1px solid rgba(30, 58, 138, 0.1);
+            border-radius: 999px;
+            padding: 0.55rem 0.8rem;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+            flex-shrink: 0;
+        }
+
+        .sort-container label {
+            font-size: 0.72rem;
+            font-weight: 800;
+            color: var(--muted-blue);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            white-space: nowrap;
+        }
+
+        .sort-select {
+            border: 1px solid rgba(30, 58, 138, 0.18);
+            border-radius: 999px;
+            padding: 0.3rem 0.65rem;
+            background: var(--pure-white);
+            color: var(--deep-black);
+            font-size: 0.78rem;
+            font-weight: 700;
+            outline: none;
+        }
+
+        .sort-select:focus {
+            border-color: var(--primary-night-blue);
+            box-shadow: 0 0 0 2px rgba(30, 58, 138, 0.18);
         }
 
         .search-container input {
@@ -127,9 +182,21 @@
             min-height: 0; 
         }
 
+        .table-scroll {
+            flex: 1;
+            min-height: 0;
+            overflow-x: auto;
+            overflow-y: hidden;
+        }
+
+        .table-scroll:focus-visible {
+            outline: 2px solid var(--primary-night-blue);
+            outline-offset: 2px;
+        }
+
         .table-header {
             display: grid;
-            grid-template-columns: 1.2fr 1fr 1.5fr 1fr 1fr 0.8fr;
+            grid-template-columns: minmax(140px, 1.2fr) minmax(120px, 1fr) minmax(220px, 1.5fr) minmax(150px, 1fr) minmax(150px, 1fr) minmax(120px, 0.8fr) minmax(260px, 1.6fr);
             padding: 1.2rem 2rem;
             background: var(--deep-black);
             color: white;
@@ -138,22 +205,40 @@
             text-transform: uppercase;
             letter-spacing: 1px;
             flex-shrink: 0;
+            column-gap: 0.75rem;
+            min-width: 1320px;
         }
 
         .table-body {
             flex: 1;
             overflow-y: auto;
             scroll-behavior: smooth;
+            min-width: 1320px;
         }
 
         .row {
             display: grid;
-            grid-template-columns: 1.2fr 1fr 1.5fr 1fr 1fr 0.8fr;
+            grid-template-columns: minmax(140px, 1.2fr) minmax(120px, 1fr) minmax(220px, 1.5fr) minmax(150px, 1fr) minmax(150px, 1fr) minmax(120px, 0.8fr) minmax(260px, 1.6fr);
             padding: 1.2rem 2rem;
             border-bottom: 1px solid var(--bg-grey);
-            align-items: center;
+            align-items: flex-start;
             font-size: 0.85rem;
             transition: 0.2s;
+            column-gap: 0.75rem;
+        }
+
+        .row > div { min-width: 0; }
+
+        .row-empty {
+            grid-template-columns: 1fr;
+            align-items: center;
+        }
+
+        .cell-empty {
+            text-align: center;
+            color: var(--muted-blue);
+            font-weight: 700;
+            padding: 0.25rem 0;
         }
 
         .row:hover { background: rgba(0, 212, 255, 0.03); }
@@ -163,8 +248,25 @@
         .status-pending { background: #fff8e1; color: #b7791f; }
         .status-disabled { background: #f1f5f9; color: #94a3b8; }
 
-        .link-text { color: var(--accent-blue); text-decoration: none; font-weight: 600; }
-        .link-text:hover { text-decoration: underline; }
+        .repo-link-chip {
+            color: var(--accent-blue);
+            text-decoration: none;
+            font-weight: 800;
+            font-size: 0.72rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid rgba(59, 130, 246, 0.35);
+            border-radius: 999px;
+            padding: 0.28rem 0.62rem;
+            white-space: nowrap;
+            max-width: 100%;
+        }
+
+        .repo-link-chip:hover {
+            background: rgba(59, 130, 246, 0.08);
+            text-decoration: none;
+        }
 
         .btn-watch {
             display: flex;
@@ -185,6 +287,79 @@
         .btn-watch:hover {
             transform: scale(1.05);
             background: var(--accent-blue);
+        }
+
+        .evaluation-cell {
+            display: grid;
+            gap: 0.4rem;
+            width: 100%;
+        }
+
+        .eval-select,
+        .feedback-input {
+            width: 100%;
+            border: 1px solid var(--bg-grey);
+            border-radius: 8px;
+            outline: none;
+            font-size: 0.74rem;
+            font-weight: 600;
+            color: var(--deep-black);
+            background: var(--pure-white);
+        }
+
+        .eval-select {
+            min-height: 34px;
+            padding: 0.35rem 0.5rem;
+        }
+
+        .feedback-input {
+            min-height: 56px;
+            padding: 0.45rem 0.55rem;
+            resize: vertical;
+            line-height: 1.35;
+        }
+
+        .eval-select:focus,
+        .feedback-input:focus {
+            border-color: var(--primary-night-blue);
+            box-shadow: 0 0 0 2px rgba(30, 58, 138, 0.18);
+        }
+
+        .btn-eval-save {
+            justify-self: start;
+            border: none;
+            border-radius: 8px;
+            background: var(--deep-black);
+            color: white;
+            font-size: 0.72rem;
+            font-weight: 800;
+            padding: 0.38rem 0.7rem;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .btn-eval-save:hover:not(:disabled) {
+            background: var(--primary-night-blue);
+        }
+
+        .btn-eval-save:disabled {
+            opacity: 0.7;
+            cursor: wait;
+        }
+
+        .eval-message {
+            min-height: 1em;
+            font-size: 0.68rem;
+            font-weight: 700;
+            color: var(--muted-blue);
+        }
+
+        .eval-message.success {
+            color: #166534;
+        }
+
+        .eval-message.error {
+            color: #b91c1c;
         }
 
         /* --- Video Modal --- */
@@ -336,6 +511,31 @@
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
         }
 
+        [data-theme="dark"] .sort-container {
+            background: rgba(26, 29, 38, 0.92);
+            border-color: rgba(46, 196, 182, 0.22);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
+        }
+
+        [data-theme="dark"] .sort-container label {
+            color: var(--dark-muted);
+        }
+
+        [data-theme="dark"] .sort-select {
+            background: #12151e;
+            border-color: #2f3645;
+            color: var(--dark-text);
+        }
+
+        [data-theme="dark"] .repo-link-chip {
+            border-color: rgba(46, 196, 182, 0.45);
+            color: var(--dark-accent);
+        }
+
+        [data-theme="dark"] .repo-link-chip:hover {
+            background: rgba(46, 196, 182, 0.12);
+        }
+
         [data-theme="dark"] .search-container input::placeholder {
             color: #8f8372;
         }
@@ -350,6 +550,38 @@
 
         [data-theme="dark"] .row:hover {
             background: rgba(46, 196, 182, 0.14);
+        }
+
+        [data-theme="dark"] .eval-select,
+        [data-theme="dark"] .feedback-input {
+            background: #12151e;
+            border-color: #2f3645;
+            color: var(--dark-text);
+        }
+
+        [data-theme="dark"] .feedback-input::placeholder {
+            color: #8a94a8;
+        }
+
+        [data-theme="dark"] .btn-eval-save {
+            background: var(--dark-accent);
+            color: #072824;
+        }
+
+        [data-theme="dark"] .btn-eval-save:hover:not(:disabled) {
+            background: #26aea1;
+        }
+
+        [data-theme="dark"] .eval-message {
+            color: var(--dark-muted);
+        }
+
+        [data-theme="dark"] .eval-message.success {
+            color: #86efac;
+        }
+
+        [data-theme="dark"] .eval-message.error {
+            color: #fca5a5;
         }
 
         [data-theme="dark"] .status-done { background: rgba(159, 232, 112, 0.2); color: var(--dark-highlight); }
@@ -367,6 +599,101 @@
 
         [data-theme="dark"] .modal-header p {
             color: var(--dark-muted);
+        }
+
+        @media (max-width: 1024px) {
+            header {
+                padding: 1rem 1.25rem;
+                flex-wrap: wrap;
+                align-items: flex-start;
+                gap: 0.75rem;
+            }
+
+            .nav-wrapper {
+                width: 100%;
+                justify-content: space-between;
+                flex-wrap: wrap;
+                gap: 0.75rem;
+            }
+
+            main {
+                padding: 0 1.25rem 1.5rem;
+                gap: 0.875rem;
+            }
+
+            .search-container {
+                border-radius: 16px;
+                padding: 0.7rem 1rem;
+            }
+
+            .sort-container {
+                border-radius: 16px;
+                padding: 0.5rem 0.7rem;
+            }
+
+            .table-header,
+            .row {
+                padding: 1rem 1.25rem;
+            }
+
+            .table-header,
+            .table-body {
+                min-width: 1150px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            main {
+                padding: 0 1rem 1.25rem;
+            }
+
+            .search-container {
+                border-radius: 14px;
+                padding: 0.65rem 0.9rem;
+            }
+
+            .toolbar-row {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .sort-container {
+                width: 100%;
+                justify-content: space-between;
+                border-radius: 14px;
+            }
+
+            .sort-select {
+                width: min(62%, 220px);
+            }
+
+            .table-header {
+                font-size: 0.62rem;
+                letter-spacing: 0.6px;
+            }
+
+            .table-header,
+            .row {
+                padding: 0.85rem 1rem;
+            }
+
+            .table-header,
+            .table-body {
+                min-width: 1060px;
+            }
+
+            .btn-watch {
+                padding: 5px 9px;
+                font-size: 0.7rem;
+            }
+
+            .video-modal {
+                padding: 1rem;
+            }
+
+            .modal-header {
+                padding: 0.9rem 1rem;
+            }
         }
 
     </style>
@@ -387,23 +714,36 @@
     </header>
 
     <main>
-        <div class="search-container">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--muted-blue)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <input type="text" id="searchInput" placeholder="Search by Name, Reg No or Project..." onkeyup="filterSubmissions()">
+        <div class="toolbar-row">
+            <div class="search-container">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--muted-blue)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input type="text" id="searchInput" placeholder="Search by Name, Reg No or Project..." onkeyup="filterSubmissions()">
+            </div>
+            <div class="sort-container">
+                <label for="sortSelect">Sort</label>
+                <select id="sortSelect" class="sort-select" aria-label="Sort submissions list">
+                    <option value="uploaded_desc">Latest Upload</option>
+                    <option value="name_asc">Name (A-Z)</option>
+                    <option value="register_asc">Register No (A-Z)</option>
+                </select>
+            </div>
         </div>
 
         <div class="table-card">
-            <div class="table-header">
-                <div>User Name</div>
-                <div>Reg No</div>
-                <div>Project / Repo</div>
-                <div>Meeting Video</div>
-                <div>Demo Video</div>
-                <div>Status</div>
-            </div>
-            <div class="table-body" id="tableBody">
-                <div class="row" style="grid-template-columns: 1fr;">
-                    <div style="text-align:center;color:var(--muted-blue);font-weight:700;">Loading submissions...</div>
+            <div class="table-scroll" tabindex="0" aria-label="Submissions table horizontal scroll area">
+                <div class="table-header">
+                    <div>User Name</div>
+                    <div>Reg No</div>
+                    <div>Project / Repo</div>
+                    <div>Meeting Video</div>
+                    <div>Demo Video</div>
+                    <div>Status</div>
+                    <div>Evaluation / Feedback</div>
+                </div>
+                <div class="table-body" id="tableBody">
+                    <div class="row row-empty">
+                        <div class="cell-empty">Loading submissions...</div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -435,6 +775,7 @@
     <script>
         const logoutLink = document.getElementById('logoutLink');
         const searchInput = document.getElementById('searchInput');
+        const sortSelect = document.getElementById('sortSelect');
         const tableBody = document.getElementById('tableBody');
         const API_ROOTS = (() => {
             const candidates = [];
@@ -460,6 +801,7 @@
         const AUTH_ROLE_KEY = 'devela-user-role';
         const AUTH_USER_ID_KEY = 'devela-user-id';
         let searchTimer = null;
+        let lastLoadedSubmissions = [];
 
         function getApiRoots() {
             const merged = [activeApiRoot, ...API_ROOTS];
@@ -548,17 +890,33 @@
 
         function makeEmptyRow(message) {
             const row = document.createElement('div');
-            row.className = 'row';
-            row.style.gridTemplateColumns = '1fr';
+            row.className = 'row row-empty';
 
             const content = document.createElement('div');
-            content.style.textAlign = 'center';
-            content.style.color = 'var(--muted-blue)';
-            content.style.fontWeight = '700';
+            content.className = 'cell-empty';
             content.textContent = message;
 
             row.appendChild(content);
             return row;
+        }
+
+        function normalizeEvaluationDecision(rawDecision) {
+            const normalized = String(rawDecision || '').trim().toLowerCase();
+            if (normalized === 'accepted' || normalized === 'rejected') {
+                return normalized;
+            }
+            return 'pending';
+        }
+
+        function sortSubmissions(items, sortMode) {
+            const list = Array.isArray(items) ? [...items] : [];
+            if (sortMode === 'name_asc') {
+                return list.sort((a, b) => String(a?.user_name || '').localeCompare(String(b?.user_name || ''), undefined, { sensitivity: 'base' }));
+            }
+            if (sortMode === 'register_asc') {
+                return list.sort((a, b) => String(a?.register_no || '').localeCompare(String(b?.register_no || ''), undefined, { numeric: true, sensitivity: 'base' }));
+            }
+            return list;
         }
 
         function renderSubmissions(items) {
@@ -583,11 +941,13 @@
                 const repoCell = document.createElement('div');
                 if (item.repo_link) {
                     const repoLink = document.createElement('a');
-                    repoLink.className = 'link-text';
+                    repoLink.className = 'repo-link-chip';
                     repoLink.href = item.repo_link;
                     repoLink.target = '_blank';
                     repoLink.rel = 'noopener noreferrer';
-                    repoLink.textContent = item.repo_link;
+                    repoLink.setAttribute('aria-label', 'Open repository in a new tab');
+                    repoLink.title = item.repo_link;
+                    repoLink.textContent = 'Open Repo';
                     repoCell.appendChild(repoLink);
                 } else {
                     repoCell.style.color = 'var(--muted-blue)';
@@ -635,12 +995,82 @@
                 statusTag.textContent = statusLabel(item.status);
                 statusCell.appendChild(statusTag);
 
+                const evaluationCell = document.createElement('div');
+                evaluationCell.className = 'evaluation-cell';
+
+                const decisionSelect = document.createElement('select');
+                decisionSelect.className = 'eval-select';
+                decisionSelect.innerHTML = [
+                    '<option value="pending">Pending Review</option>',
+                    '<option value="accepted">Accepted</option>',
+                    '<option value="rejected">Rejected</option>',
+                ].join('');
+                decisionSelect.value = normalizeEvaluationDecision(item.evaluation_decision);
+
+                const feedbackInput = document.createElement('textarea');
+                feedbackInput.className = 'feedback-input';
+                feedbackInput.rows = 2;
+                feedbackInput.maxLength = 2000;
+                feedbackInput.placeholder = 'Type evaluation feedback for this student...';
+                feedbackInput.value = item.admin_feedback || '';
+
+                const saveButton = document.createElement('button');
+                saveButton.className = 'btn-eval-save';
+                saveButton.type = 'button';
+                saveButton.textContent = 'Save';
+
+                const evaluationMessage = document.createElement('p');
+                evaluationMessage.className = 'eval-message';
+
+                saveButton.addEventListener('click', async () => {
+                    const selectedDecision = normalizeEvaluationDecision(decisionSelect.value);
+                    const feedbackText = feedbackInput.value.trim();
+
+                    saveButton.disabled = true;
+                    saveButton.textContent = 'Saving...';
+                    evaluationMessage.textContent = '';
+                    evaluationMessage.classList.remove('success', 'error');
+
+                    try {
+                        const result = await apiFetch('/submissions/update-evaluation', {
+                            method: 'PATCH',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                submission_id: item.submission_id,
+                                evaluation_decision: selectedDecision,
+                                admin_feedback: feedbackText || null,
+                            }),
+                        });
+
+                        item.evaluation_decision = result.evaluation_decision;
+                        item.admin_feedback = result.admin_feedback;
+                        decisionSelect.value = normalizeEvaluationDecision(result.evaluation_decision);
+                        feedbackInput.value = result.admin_feedback || '';
+                        evaluationMessage.textContent = 'Saved';
+                        evaluationMessage.classList.add('success');
+                    } catch (error) {
+                        evaluationMessage.textContent = error.message || 'Failed to save evaluation.';
+                        evaluationMessage.classList.add('error');
+                    } finally {
+                        saveButton.disabled = false;
+                        saveButton.textContent = 'Save';
+                    }
+                });
+
+                evaluationCell.appendChild(decisionSelect);
+                evaluationCell.appendChild(feedbackInput);
+                evaluationCell.appendChild(saveButton);
+                evaluationCell.appendChild(evaluationMessage);
+
                 row.appendChild(userCell);
                 row.appendChild(regCell);
                 row.appendChild(repoCell);
                 row.appendChild(meetingVideoCell);
                 row.appendChild(demoVideoCell);
                 row.appendChild(statusCell);
+                row.appendChild(evaluationCell);
 
                 tableBody.appendChild(row);
             });
@@ -661,7 +1091,9 @@
                 }
 
                 const result = await apiFetch(`/submissions/list?${params.toString()}`);
-                renderSubmissions(result.submissions || []);
+                lastLoadedSubmissions = Array.isArray(result.submissions) ? result.submissions : [];
+                const selectedSortMode = sortSelect ? sortSelect.value : 'uploaded_desc';
+                renderSubmissions(sortSubmissions(lastLoadedSubmissions, selectedSortMode));
             } catch (error) {
                 tableBody.innerHTML = '';
                 tableBody.appendChild(makeEmptyRow(error.message || 'Unable to load submissions.'));
@@ -674,6 +1106,11 @@
             searchTimer = setTimeout(() => {
                 loadSubmissions(query);
             }, 300);
+        }
+
+        function applySort() {
+            const selectedSortMode = sortSelect ? sortSelect.value : 'uploaded_desc';
+            renderSubmissions(sortSubmissions(lastLoadedSubmissions, selectedSortMode));
         }
 
         const modal = document.getElementById('videoModal');
@@ -736,6 +1173,10 @@
 
         if (logoutLink) {
             logoutLink.addEventListener('click', handleLogout);
+        }
+
+        if (sortSelect) {
+            sortSelect.addEventListener('change', applySort);
         }
 
         requireAdminSession();

@@ -7,10 +7,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.core.dependencies import require_admin
 from app.db.session import get_db
-from app.models.submission import Submission, VideoAsset
+from app.models.submission import Submission, SubmissionEvaluation, VideoAsset
 from app.models.usecase import UseCase
 from app.models.user import User
 from app.schemas.submission import (
+    SubmissionEvaluationUpdateRequest,
+    SubmissionEvaluationUpdateResponse,
     StatusUpdateRequest,
     StatusUpdateResponse,
     SubmissionListItem,
@@ -51,6 +53,7 @@ def _get_submission_video_assets(db: Session, submission_id: int) -> tuple[Video
 
 def _build_submission_item(db: Session, submission: Submission) -> SubmissionListItem:
     meeting_asset, demo_asset = _get_submission_video_assets(db, submission.id)
+    evaluation = submission.evaluation
 
     return SubmissionListItem(
         submission_id=submission.id,
@@ -62,6 +65,8 @@ def _build_submission_item(db: Session, submission: Submission) -> SubmissionLis
         meeting_video_id=meeting_asset.id if meeting_asset else None,
         demo_video_id=demo_asset.id if demo_asset else None,
         status=submission.status,
+        evaluation_decision=evaluation.decision if evaluation else None,
+        admin_feedback=evaluation.feedback if evaluation else None,
     )
 
 
@@ -134,4 +139,38 @@ def update_submission_status(
         success=True,
         submission_id=submission.id,
         updated_status=submission.status,
+    )
+
+
+@router.patch("/update-evaluation", response_model=SubmissionEvaluationUpdateResponse)
+def update_submission_evaluation(
+    payload: SubmissionEvaluationUpdateRequest,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+) -> SubmissionEvaluationUpdateResponse:
+    submission = db.get(Submission, payload.submission_id)
+    if submission is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Submission not found.",
+        )
+
+    evaluation = submission.evaluation
+    if evaluation is None:
+        evaluation = SubmissionEvaluation(submission_id=submission.id)
+
+    feedback = payload.admin_feedback.strip() if isinstance(payload.admin_feedback, str) else ""
+    evaluation.decision = payload.evaluation_decision
+    evaluation.feedback = feedback or None
+
+    db.add(evaluation)
+    db.commit()
+    db.refresh(evaluation)
+
+    return SubmissionEvaluationUpdateResponse(
+        success=True,
+        submission_id=submission.id,
+        evaluation_decision=evaluation.decision,
+        admin_feedback=evaluation.feedback,
+        message="Evaluation updated successfully.",
     )

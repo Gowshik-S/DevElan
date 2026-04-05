@@ -3,7 +3,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, HttpUrl
 
-from app.models.submission import SubmissionStatus
+from app.models.submission import SubmissionEvaluationDecision, SubmissionStatus
 
 
 class RepoLinkSubmissionRequest(BaseModel):
@@ -70,6 +70,8 @@ class SubmissionDetail(BaseModel):
     meeting_video_id: int | None = None
     demo_video_id: int | None = None
     status: SubmissionStatus
+    evaluation_decision: SubmissionEvaluationDecision | None = None
+    admin_feedback: str | None = None
 
 
 class SubmissionListItem(BaseModel):
@@ -82,6 +84,8 @@ class SubmissionListItem(BaseModel):
     meeting_video_id: int | None = None
     demo_video_id: int | None = None
     status: SubmissionStatus
+    evaluation_decision: SubmissionEvaluationDecision | None = None
+    admin_feedback: str | None = None
 
 
 class SubmissionListResponse(BaseModel):
@@ -100,3 +104,17 @@ class StatusUpdateResponse(BaseModel):
     success: bool
     submission_id: int
     updated_status: SubmissionStatus
+
+
+class SubmissionEvaluationUpdateRequest(BaseModel):
+    submission_id: int
+    evaluation_decision: SubmissionEvaluationDecision
+    admin_feedback: str | None = Field(default=None, max_length=2000)
+
+
+class SubmissionEvaluationUpdateResponse(BaseModel):
+    success: bool
+    submission_id: int
+    evaluation_decision: SubmissionEvaluationDecision
+    admin_feedback: str | None = None
+    message: str

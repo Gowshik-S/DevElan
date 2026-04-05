@@ -297,3 +297,37 @@
 - Demo upload now displays `Uploading X% (uploaded/total MB) • speed MB/s` and ETA while uploading.
 - Added demo progress lifecycle helpers (`reset/show/hide/complete`) and invoked them on file selection, upload start, success, and failure paths.
 - Verified via render checks that demo progress markup, functions, and live callback wiring are present.
+
+## Admin Evaluation + Alignment Plan (2026-04-06)
+
+- [x] Add backend submission-evaluation persistence for accepted/rejected decision and admin feedback
+- [x] Expose evaluation fields in submissions list/detail payloads for admin UI rendering
+- [x] Add per-student evaluation controls (decision + feedback + save) in admin submissions page
+- [x] Improve alignment/responsive behavior in admin management and submissions pages
+- [x] Run focused smoke checks and record implementation review notes
+
+### Admin Evaluation + Alignment Review (2026-04-06)
+
+- Added a new `submission_evaluations` persistence model with one-to-one linkage to submissions, storing `decision` (`pending|accepted|rejected`) and optional `feedback`.
+- Added `PATCH /api/v1/submissions/update-evaluation` and extended submissions list/detail payloads with `evaluation_decision` and `admin_feedback`.
+- Updated admin submissions UI (`Frontend/form.html`) with per-student evaluation controls: decision dropdown, feedback textarea, and save action.
+- Improved alignment/responsiveness for both admin pages by adding centered max-width layout, mobile/tablet header wrapping, and table horizontal-scroll strategy for narrow viewports.
+- Verified with smoke checks:
+	- OpenAPI route presence for update-evaluation.
+	- Render markers for evaluation UI elements in `/submissions`.
+	- End-to-end API flow: admin login -> update evaluation -> list payload contains persisted decision and feedback.
+
+## Submissions Sort + Compact Repo Link Plan (2026-04-06)
+
+- [x] Add sort control in submissions page with default latest-upload behavior
+- [x] Add name/register number sort options for admin submissions list
+- [x] Render repo link as a compact control while keeping new-tab navigation
+- [x] Validate rendered page markers for sort wiring and repo-link behavior
+
+### Submissions Sort + Compact Repo Link Review (2026-04-06)
+
+- Added a toolbar sort dropdown with options: `Latest Upload` (default), `Name (A-Z)`, and `Register No (A-Z)`.
+- Preserved existing upload-time ordering by default by keeping API response order untouched for `Latest Upload`.
+- Added client-side sort helpers for name/register options and wired immediate re-render on sort changes.
+- Updated repository link rendering to a compact `Open Repo` chip with `target="_blank"` and `rel="noopener noreferrer"`.
+- Verified render markers confirm sort controls, sort functions, compact repo-link class, and new-tab behavior.

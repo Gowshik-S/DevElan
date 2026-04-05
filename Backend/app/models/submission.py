@@ -1,7 +1,7 @@
 import enum
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum as SqlEnum, ForeignKey, String, UniqueConstraint, func
+from sqlalchemy import DateTime, Enum as SqlEnum, ForeignKey, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -13,6 +13,12 @@ class SubmissionStatus(str, enum.Enum):
     PENDING = "pending"
     WAITING = "waiting"
     NO_VIDEO = "no-video"
+
+
+class SubmissionEvaluationDecision(str, enum.Enum):
+    PENDING = "pending"
+    ACCEPTED = "accepted"
+    REJECTED = "rejected"
 
 
 class Submission(Base):
@@ -45,6 +51,12 @@ class Submission(Base):
     user = relationship("User", back_populates="submissions")
     usecase = relationship("UseCase", back_populates="submissions")
     video_assets = relationship("VideoAsset", back_populates="submission", cascade="all, delete-orphan")
+    evaluation = relationship(
+        "SubmissionEvaluation",
+        back_populates="submission",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
 
 
 class VideoAsset(Base):
@@ -67,3 +79,29 @@ class VideoAsset(Base):
     )
 
     submission = relationship("Submission", back_populates="video_assets")
+
+
+class SubmissionEvaluation(Base):
+    __tablename__ = "submission_evaluations"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    submission_id: Mapped[int] = mapped_column(
+        ForeignKey("submissions.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+        index=True,
+    )
+    decision: Mapped[SubmissionEvaluationDecision] = mapped_column(
+        SqlEnum(SubmissionEvaluationDecision, name="submission_evaluation_decision_enum"),
+        default=SubmissionEvaluationDecision.PENDING,
+        nullable=False,
+    )
+    feedback: Mapped[str | None] = mapped_column(Text, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    submission = relationship("Submission", back_populates="evaluation")
