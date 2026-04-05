@@ -366,6 +366,76 @@
         .checkmark-icon svg { width: 18px; height: 18px; stroke: #1e7e34; fill: none; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
         .submitted-text { color: #1e7e34; font-weight: 800; font-size: 0.8rem; }
 
+        .upload-progress {
+            display: none;
+            flex-direction: column;
+            gap: 0.35rem;
+        }
+
+        .upload-progress.active {
+            display: flex;
+        }
+
+        .upload-progress-track {
+            width: 100%;
+            height: 8px;
+            border-radius: 999px;
+            background: rgba(84, 104, 119, 0.22);
+            overflow: hidden;
+        }
+
+        .upload-progress-fill {
+            width: 0%;
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary-cyan), var(--primary-night-blue));
+            transition: width 0.15s linear;
+        }
+
+        .upload-progress.complete .upload-progress-fill {
+            background: linear-gradient(90deg, #86efac, #22c55e);
+            animation: uploadCompletePulse 0.85s ease-in-out 2;
+        }
+
+        .upload-progress-meta {
+            display: flex;
+            justify-content: space-between;
+            gap: 0.75rem;
+            font-size: 0.68rem;
+            font-weight: 700;
+            color: var(--muted-blue);
+        }
+
+        .upload-progress-eta {
+            font-size: 0.66rem;
+            font-weight: 700;
+            color: var(--muted-blue);
+        }
+
+        .btn-upload-cancel {
+            display: none;
+            border: 1px solid rgba(220, 38, 38, 0.28);
+            background: rgba(220, 38, 38, 0.08);
+            color: #b91c1c;
+            border-radius: 9px;
+            padding: 0.5rem 0.7rem;
+            font-size: 0.72rem;
+            font-weight: 800;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .btn-upload-cancel.active {
+            display: inline-flex;
+            align-self: flex-end;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .btn-upload-cancel:hover {
+            background: rgba(220, 38, 38, 0.15);
+            border-color: rgba(220, 38, 38, 0.45);
+        }
+
         [data-theme="dark"] {
             --dark-bg: #0d1110;
             --dark-surface: #18201e;
@@ -512,11 +582,47 @@
             color: var(--dark-highlight);
         }
 
+        [data-theme="dark"] .upload-progress-track {
+            background: rgba(143, 131, 114, 0.28);
+        }
+
+        [data-theme="dark"] .upload-progress-fill {
+            background: linear-gradient(90deg, var(--dark-highlight), var(--dark-accent));
+        }
+
+        [data-theme="dark"] .upload-progress.complete .upload-progress-fill {
+            background: linear-gradient(90deg, #86efac, #22c55e);
+        }
+
+        [data-theme="dark"] .upload-progress-meta {
+            color: var(--dark-muted);
+        }
+
+        [data-theme="dark"] .upload-progress-eta {
+            color: var(--dark-muted);
+        }
+
+        [data-theme="dark"] .btn-upload-cancel {
+            border-color: rgba(248, 113, 113, 0.42);
+            background: rgba(185, 28, 28, 0.24);
+            color: #fecaca;
+        }
+
+        [data-theme="dark"] .btn-upload-cancel:hover {
+            background: rgba(239, 68, 68, 0.34);
+            border-color: rgba(248, 113, 113, 0.65);
+        }
+
         @keyframes slideInLeft { from { opacity: 0; transform: translateX(-30px); } to { opacity: 1; transform: translateX(0); } }
         @keyframes slideInRight { from { opacity: 0; transform: translateX(30px); } to { opacity: 1; transform: translateX(0); } }
         @keyframes slideInUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes bounceIn { 0% { transform: scale(0.3); opacity: 0; } 50% { transform: scale(1.05); opacity: 1; } 100% { transform: scale(1); } }
+        @keyframes uploadCompletePulse {
+            0% { filter: brightness(1); }
+            50% { filter: brightness(1.25) drop-shadow(0 0 6px rgba(34, 197, 94, 0.7)); }
+            100% { filter: brightness(1); }
+        }
     </style>
 </head>
 <body>
@@ -577,6 +683,17 @@
             <div class="submission-card" id="videoCard">
                 <div class="input-group" style="flex: 1; display: flex; flex-direction: column;"><label>Demo Recording</label><div class="upload-box"><span id="fileText">Select Recording</span><input type="file" id="videoUpload" title="Select demo recording" accept="video/*" onchange="updateFileName()"></div></div>
                 <button class="btn-submit" id="videoSubmitBtn" onclick="submitVideo()">Upload</button>
+                <div class="upload-progress" id="videoUploadProgress" aria-live="polite">
+                    <div class="upload-progress-track">
+                        <div class="upload-progress-fill" id="videoUploadProgressFill"></div>
+                    </div>
+                    <div class="upload-progress-meta">
+                        <span id="videoUploadProgressPercent">0.0%</span>
+                        <span id="videoUploadProgressStats">0.0/0.0 MB • 0.00 MB/s</span>
+                    </div>
+                    <div class="upload-progress-eta" id="videoUploadEta">ETA: --</div>
+                </div>
+                <button type="button" class="btn-upload-cancel" id="videoUploadCancelBtn">Cancel Upload</button>
                 <p id="videoMessage" style="font-size:0.75rem;font-weight:700;color:var(--muted-blue);"></p>
                 <div class="submitted-overlay" id="videoSuccess"><div class="checkmark-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg></div><div class="submitted-text">Uploaded</div></div>
             </div>
@@ -600,6 +717,17 @@
         const AUTH_ROLE_KEY = 'devela-user-role';
         const AUTH_USER_ID_KEY = 'devela-user-id';
         let activeUseCaseId = null;
+        const DEFAULT_MAX_VIDEO_SIZE_MB = 200;
+        const MAX_VIDEO_SIZE_MB = Number('{{ max_upload_size_mb | default(200) }}') || DEFAULT_MAX_VIDEO_SIZE_MB;
+        const MAX_VIDEO_SIZE_BYTES = MAX_VIDEO_SIZE_MB * 1024 * 1024;
+
+        const videoUploadProgress = document.getElementById('videoUploadProgress');
+        const videoUploadProgressFill = document.getElementById('videoUploadProgressFill');
+        const videoUploadProgressPercent = document.getElementById('videoUploadProgressPercent');
+        const videoUploadProgressStats = document.getElementById('videoUploadProgressStats');
+        const videoUploadEta = document.getElementById('videoUploadEta');
+        const videoUploadCancelBtn = document.getElementById('videoUploadCancelBtn');
+        let activeVideoUploadState = null;
 
         function getApiRoots() {
             const merged = [activeApiRoot, ...API_ROOTS];
@@ -663,6 +791,249 @@
                 throw new Error(payload.detail || 'Request failed.');
             }
             return payload;
+        }
+
+        function formatMegabytes(bytes) {
+            return (bytes / (1024 * 1024)).toFixed(1);
+        }
+
+        function formatEta(seconds) {
+            if (!Number.isFinite(seconds) || seconds <= 0) {
+                return '0s';
+            }
+
+            const rounded = Math.ceil(seconds);
+            const minutes = Math.floor(rounded / 60);
+            const remainingSeconds = rounded % 60;
+            if (minutes <= 0) {
+                return `${remainingSeconds}s`;
+            }
+            return `${minutes}m ${remainingSeconds}s`;
+        }
+
+        function resetVideoUploadProgress() {
+            if (videoUploadProgressFill) {
+                videoUploadProgressFill.style.width = '0%';
+            }
+            if (videoUploadProgressPercent) {
+                videoUploadProgressPercent.textContent = '0.0%';
+            }
+            if (videoUploadProgressStats) {
+                videoUploadProgressStats.textContent = '0.0/0.0 MB • 0.00 MB/s';
+            }
+            if (videoUploadEta) {
+                videoUploadEta.textContent = 'ETA: --';
+            }
+            if (videoUploadProgress) {
+                videoUploadProgress.classList.remove('complete');
+            }
+        }
+
+        function showVideoUploadProgress() {
+            if (videoUploadProgress) {
+                videoUploadProgress.classList.add('active');
+            }
+        }
+
+        function hideVideoUploadProgress() {
+            if (videoUploadProgress) {
+                videoUploadProgress.classList.remove('active');
+                videoUploadProgress.classList.remove('complete');
+            }
+        }
+
+        function showVideoUploadCancel() {
+            if (videoUploadCancelBtn) {
+                videoUploadCancelBtn.classList.add('active');
+                videoUploadCancelBtn.disabled = false;
+                videoUploadCancelBtn.textContent = 'Cancel Upload';
+            }
+        }
+
+        function hideVideoUploadCancel() {
+            if (videoUploadCancelBtn) {
+                videoUploadCancelBtn.classList.remove('active');
+                videoUploadCancelBtn.disabled = false;
+                videoUploadCancelBtn.textContent = 'Cancel Upload';
+            }
+        }
+
+        function markVideoUploadCompleted() {
+            if (videoUploadProgress) {
+                videoUploadProgress.classList.add('complete');
+            }
+            if (videoUploadEta) {
+                videoUploadEta.textContent = 'ETA: done';
+            }
+        }
+
+        function updateVideoUploadProgressView(progress) {
+            const clampedPercent = Math.max(0, Math.min(progress.progressPercent || 0, 100));
+            const uploadedMb = formatMegabytes(progress.uploadedBytes || 0);
+            const totalMb = formatMegabytes(progress.totalBytes || 0);
+            const speedMbps = ((progress.speedBytesPerSecond || 0) / (1024 * 1024)).toFixed(2);
+            const remainingBytes = Math.max((progress.totalBytes || 0) - (progress.uploadedBytes || 0), 0);
+            const etaSeconds = (progress.speedBytesPerSecond || 0) > 0
+                ? remainingBytes / progress.speedBytesPerSecond
+                : Number.POSITIVE_INFINITY;
+
+            if (videoUploadProgressFill) {
+                videoUploadProgressFill.style.width = `${clampedPercent.toFixed(1)}%`;
+            }
+            if (videoUploadProgressPercent) {
+                videoUploadProgressPercent.textContent = `${clampedPercent.toFixed(1)}%`;
+            }
+            if (videoUploadProgressStats) {
+                videoUploadProgressStats.textContent = `${uploadedMb}/${totalMb} MB • ${speedMbps} MB/s`;
+            }
+            if (videoUploadEta) {
+                if (clampedPercent >= 100) {
+                    videoUploadEta.textContent = 'ETA: done';
+                } else if (Number.isFinite(etaSeconds)) {
+                    videoUploadEta.textContent = `ETA: ${formatEta(etaSeconds)}`;
+                } else {
+                    videoUploadEta.textContent = 'ETA: calculating...';
+                }
+            }
+        }
+
+        function uploadVideoToCandidate(candidate, path, token, useCaseId, videoFile, onProgress, uploadState) {
+            return new Promise((resolve, reject) => {
+                const xhr = new XMLHttpRequest();
+                const startedAtMs = Date.now();
+                const url = `${candidate}${path}`;
+
+                if (uploadState && uploadState.cancelled) {
+                    const cancelledError = new Error('Upload cancelled by user.');
+                    cancelledError.isCancelled = true;
+                    reject(cancelledError);
+                    return;
+                }
+
+                xhr.open('POST', url, true);
+                xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                if (uploadState) {
+                    uploadState.xhr = xhr;
+                }
+
+                xhr.upload.onprogress = (event) => {
+                    if (!event.lengthComputable) {
+                        return;
+                    }
+
+                    const uploadedBytes = event.loaded;
+                    const totalBytes = event.total || videoFile.size;
+                    const elapsedSeconds = Math.max((Date.now() - startedAtMs) / 1000, 0.1);
+                    const speedBytesPerSecond = uploadedBytes / elapsedSeconds;
+                    const progressPercent = totalBytes > 0
+                        ? Math.min((uploadedBytes / totalBytes) * 100, 100)
+                        : 0;
+
+                    if (typeof onProgress === 'function') {
+                        onProgress({
+                            uploadedBytes,
+                            totalBytes,
+                            speedBytesPerSecond,
+                            progressPercent,
+                        });
+                    }
+                };
+
+                xhr.onerror = () => {
+                    if (uploadState) {
+                        uploadState.xhr = null;
+                    }
+                    reject(new Error('NETWORK_ERROR'));
+                };
+
+                xhr.onabort = () => {
+                    if (uploadState) {
+                        uploadState.xhr = null;
+                    }
+                    const cancelledError = new Error('Upload cancelled by user.');
+                    cancelledError.isCancelled = true;
+                    reject(cancelledError);
+                };
+
+                xhr.onload = () => {
+                    if (uploadState) {
+                        uploadState.xhr = null;
+                    }
+                    const payload = (() => {
+                        try {
+                            return xhr.responseText ? JSON.parse(xhr.responseText) : {};
+                        } catch (_) {
+                            return {};
+                        }
+                    })();
+
+                    if (xhr.status === 401) {
+                        clearSession();
+                        const authError = new Error('Your session has expired. Please log in again.');
+                        authError.isHttpError = true;
+                        reject(authError);
+                        return;
+                    }
+
+                    if (xhr.status >= 200 && xhr.status < 300) {
+                        resolve(payload);
+                        return;
+                    }
+
+                    const backendError = new Error(payload.detail || 'Request failed.');
+                    backendError.isHttpError = true;
+                    reject(backendError);
+                };
+
+                const formData = new FormData();
+                formData.append('use_case_id', String(useCaseId));
+                formData.append('video_file', videoFile);
+                xhr.send(formData);
+            });
+        }
+
+        async function uploadVideoWithProgress(path, useCaseId, videoFile, onProgress) {
+            const token = getToken();
+            if (!token) {
+                clearSession();
+                throw new Error('Missing authentication token.');
+            }
+
+            const candidates = getApiRoots();
+            const uploadState = { cancelled: false, xhr: null };
+            activeVideoUploadState = uploadState;
+
+            try {
+                for (const candidate of candidates) {
+                    try {
+                        const payload = await uploadVideoToCandidate(
+                            candidate,
+                            path,
+                            token,
+                            useCaseId,
+                            videoFile,
+                            onProgress,
+                            uploadState
+                        );
+                        activeApiRoot = candidate;
+                        localStorage.setItem('devela-api-root', candidate);
+                        return payload;
+                    } catch (error) {
+                        if (uploadState.cancelled || (error && error.isCancelled)) {
+                            throw error;
+                        }
+                        if (error && error.isHttpError) {
+                            throw error;
+                        }
+                    }
+                }
+
+                throw new Error(
+                    `Unable to reach backend at ${candidates.join(' or ')}. Ensure the FastAPI server is running.`
+                );
+            } finally {
+                activeVideoUploadState = null;
+            }
         }
 
         function escapeHtml(value) {
@@ -796,10 +1167,23 @@
         function updateFileName() {
             const input = document.getElementById('videoUpload');
             const label = document.getElementById('fileText');
+            hideVideoUploadProgress();
+            hideVideoUploadCancel();
+            resetVideoUploadProgress();
+
             if (input.files.length > 0) {
-                const fileName = input.files[0].name;
+                const selectedFile = input.files[0];
+                const fileName = selectedFile.name;
                 label.textContent = `File: ${fileName.length > 22 ? `${fileName.substring(0, 22)}...` : fileName}`;
                 label.style.color = 'var(--primary-night-blue)';
+
+                if (selectedFile.size > MAX_VIDEO_SIZE_BYTES) {
+                    setMessage(
+                        'videoMessage',
+                        `Video file exceeds ${MAX_VIDEO_SIZE_MB} MB limit. Please choose a smaller file.`,
+                        true
+                    );
+                }
             }
         }
 
@@ -845,6 +1229,17 @@
                 setMessage('videoMessage', 'Please select a video file first.', true);
                 return;
             }
+
+            const selectedFile = input.files[0];
+            if (selectedFile.size > MAX_VIDEO_SIZE_BYTES) {
+                setMessage(
+                    'videoMessage',
+                    `Video file exceeds ${MAX_VIDEO_SIZE_MB} MB limit. Please choose a smaller file.`,
+                    true
+                );
+                return;
+            }
+
             if (!activeUseCaseId) {
                 setMessage('videoMessage', 'No task assigned yet. Stay ready — your next challenge is coming.', true);
                 return;
@@ -853,24 +1248,54 @@
             const button = document.getElementById('videoSubmitBtn');
             button.textContent = 'Uploading...';
             button.disabled = true;
-
-            const formData = new FormData();
-            formData.append('use_case_id', String(activeUseCaseId));
-            formData.append('video_file', input.files[0]);
+            document.getElementById('videoSuccess').style.display = 'none';
+            resetVideoUploadProgress();
+            showVideoUploadProgress();
+            showVideoUploadCancel();
 
             try {
-                await apiFetch('/submission/video-upload', {
-                    method: 'POST',
-                    body: formData,
+                await uploadVideoWithProgress('/submission/video-upload', activeUseCaseId, selectedFile, (progress) => {
+                    updateVideoUploadProgressView(progress);
+                    const uploadedMb = formatMegabytes(progress.uploadedBytes || 0);
+                    const totalMb = formatMegabytes(progress.totalBytes || 0);
+                    const speedMbps = ((progress.speedBytesPerSecond || 0) / (1024 * 1024)).toFixed(2);
+                    setMessage(
+                        'videoMessage',
+                        `Uploading ${progress.progressPercent.toFixed(1)}% (${uploadedMb}/${totalMb} MB) • ${speedMbps} MB/s`
+                    );
                 });
+                updateVideoUploadProgressView({
+                    uploadedBytes: selectedFile.size,
+                    totalBytes: selectedFile.size,
+                    speedBytesPerSecond: 0,
+                    progressPercent: 100,
+                });
+                markVideoUploadCompleted();
+                await new Promise((resolve) => setTimeout(resolve, 850));
                 document.getElementById('videoSuccess').style.display = 'flex';
                 setMessage('videoMessage', 'Video uploaded successfully.');
             } catch (error) {
+                hideVideoUploadProgress();
                 setMessage('videoMessage', error.message || 'Could not upload video.', true);
             } finally {
+                hideVideoUploadCancel();
                 button.textContent = 'Upload';
                 button.disabled = false;
             }
+        }
+
+        function cancelVideoUpload() {
+            if (!activeVideoUploadState || !activeVideoUploadState.xhr) {
+                return;
+            }
+
+            activeVideoUploadState.cancelled = true;
+            if (videoUploadCancelBtn) {
+                videoUploadCancelBtn.disabled = true;
+                videoUploadCancelBtn.textContent = 'Cancelling...';
+            }
+            activeVideoUploadState.xhr.abort();
+            setMessage('videoMessage', 'Cancelling upload...', true);
         }
 
         async function handleLogout(event) {
@@ -886,6 +1311,10 @@
 
         if (logoutLink) {
             logoutLink.addEventListener('click', handleLogout);
+        }
+
+        if (videoUploadCancelBtn) {
+            videoUploadCancelBtn.addEventListener('click', cancelVideoUpload);
         }
 
         initializeStudentHome();

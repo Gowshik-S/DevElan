@@ -4,6 +4,8 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
+from app.core.config import settings
+
 router = APIRouter(tags=["Pages"])
 
 frontend_dir = Path(__file__).resolve().parents[4] / "Frontend"
@@ -27,7 +29,11 @@ def submissions_page(request: Request) -> HTMLResponse:
 
 @router.get("/user-home", response_class=HTMLResponse, include_in_schema=False)
 def user_home_page(request: Request) -> HTMLResponse:
-    return templates.TemplateResponse(request, "user_home.html")
+    return templates.TemplateResponse(
+        request,
+        "user_home.html",
+        {"max_upload_size_mb": settings.max_upload_size_mb},
+    )
 
 
 @router.get("/user-profile", response_class=HTMLResponse, include_in_schema=False)
