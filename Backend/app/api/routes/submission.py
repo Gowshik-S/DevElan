@@ -114,6 +114,48 @@ def _get_submission_video_assets(db: Session, submission_id: int) -> tuple[Video
     return meeting_asset, demo_asset
 
 
+def _is_target_video_kind(asset: VideoAsset, upload_kind: str) -> bool:
+    normalized_kind = str(upload_kind or "meeting").strip().lower()
+    is_demo_asset = _is_demo_video_asset(asset)
+    if normalized_kind == "demo":
+        return is_demo_asset
+    return not is_demo_asset
+
+
+def _collect_video_assets_to_replace(
+    db: Session,
+    submission_id: int,
+    upload_kind: str,
+    keep_stored_path: str,
+) -> list[VideoAsset]:
+    assets = db.scalars(
+        select(VideoAsset)
+        .where(VideoAsset.submission_id == submission_id)
+        .order_by(VideoAsset.created_at.desc())
+    ).all()
+
+    to_replace: list[VideoAsset] = []
+    for asset in assets:
+        if not _is_target_video_kind(asset, upload_kind):
+            continue
+        if asset.stored_path == keep_stored_path:
+            continue
+        to_replace.append(asset)
+    return to_replace
+
+
+def _cleanup_replaced_video_files(file_paths: list[str]) -> None:
+    for raw_path in file_paths:
+        normalized = str(raw_path or "").strip()
+        if not normalized:
+            continue
+        try:
+            Path(normalized).unlink(missing_ok=True)
+        except OSError:
+            # Best-effort cleanup; DB replacement already committed.
+            continue
+
+
 def _ensure_use_case_access(db: Session, user: User, use_case: UseCase) -> None:
     if user.role == UserRole.ADMIN:
         return
@@ -264,6 +306,17 @@ def complete_resumable_video_upload(
         )
         db.add(existing_asset)
 
+    db.flush()
+    replaced_assets = _collect_video_assets_to_replace(
+        db,
+        submission.id,
+        upload_kind,
+        keep_stored_path=stored_path,
+    )
+    replaced_asset_paths = [asset.stored_path for asset in replaced_assets]
+    for replaced_asset in replaced_assets:
+        db.delete(replaced_asset)
+
     if upload_kind == "meeting":
         submission.status = _derive_status(submission.repo_url, True)
     else:
@@ -273,6 +326,7 @@ def complete_resumable_video_upload(
     db.add(submission)
     db.commit()
     db.refresh(existing_asset)
+    _cleanup_replaced_video_files(replaced_asset_paths)
 
     return VideoUploadResponse(
         success=True,
@@ -361,10 +415,22 @@ def upload_video(
     )
     db.add(asset)
 
+    db.flush()
+    replaced_assets = _collect_video_assets_to_replace(
+        db,
+        submission.id,
+        "meeting",
+        keep_stored_path=stored_path,
+    )
+    replaced_asset_paths = [existing.stored_path for existing in replaced_assets]
+    for replaced_asset in replaced_assets:
+        db.delete(replaced_asset)
+
     submission.status = _derive_status(submission.repo_url, True)
     db.add(submission)
     db.commit()
     db.refresh(asset)
+    _cleanup_replaced_video_files(replaced_asset_paths)
 
     return VideoUploadResponse(
         success=True,
@@ -406,10 +472,22 @@ def upload_demo_video(
     )
     db.add(asset)
 
+    db.flush()
+    replaced_assets = _collect_video_assets_to_replace(
+        db,
+        submission.id,
+        "demo",
+        keep_stored_path=stored_path,
+    )
+    replaced_asset_paths = [existing.stored_path for existing in replaced_assets]
+    for replaced_asset in replaced_assets:
+        db.delete(replaced_asset)
+
     submission.status = _derive_status(submission.repo_url, meeting_asset is not None)
     db.add(submission)
     db.commit()
     db.refresh(asset)
+    _cleanup_replaced_video_files(replaced_asset_paths)
 
     return VideoUploadResponse(
         success=True,

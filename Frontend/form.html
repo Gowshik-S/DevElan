@@ -460,7 +460,6 @@
         const AUTH_ROLE_KEY = 'devela-user-role';
         const AUTH_USER_ID_KEY = 'devela-user-id';
         let searchTimer = null;
-        let currentVideoObjectUrl = null;
 
         function getApiRoots() {
             const merged = [activeApiRoot, ...API_ROOTS];
@@ -687,34 +686,21 @@
             modalTitle.innerText = userName;
             modalSubtitle.innerText = `Project: ${project}`;
 
-            if (currentVideoObjectUrl) {
-                URL.revokeObjectURL(currentVideoObjectUrl);
-                currentVideoObjectUrl = null;
-            }
-
             try {
-                const token = getToken();
-                if (!token) {
-                    clearSession();
-                    return;
+                const tokenPayload = await apiFetch(`/video/stream-token/${videoId}`);
+                const streamToken = String(tokenPayload.stream_token || '').trim();
+                if (!streamToken) {
+                    throw new Error('Unable to generate stream token for selected video.');
                 }
 
-                const response = await fetchWithFallback(`/video/stream/${videoId}`, {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                    },
-                });
-                if (response.status === 401) {
-                    clearSession();
-                    return;
-                }
-                if (!response.ok) {
-                    throw new Error('Unable to load selected video.');
+                const apiRoot = activeApiRoot || getApiRoots()[0];
+                if (!apiRoot) {
+                    throw new Error('Unable to resolve backend stream URL.');
                 }
 
-                const blob = await response.blob();
-                currentVideoObjectUrl = URL.createObjectURL(blob);
-                video.src = currentVideoObjectUrl;
+                video.preload = 'metadata';
+                video.src = `${apiRoot}/video/stream/${videoId}?st=${encodeURIComponent(streamToken)}`;
+                video.load();
                 video.currentTime = 0;
                 await video.play().catch(() => {});
             } catch (error) {
@@ -727,10 +713,6 @@
             video.pause();
             video.removeAttribute('src');
             video.load();
-            if (currentVideoObjectUrl) {
-                URL.revokeObjectURL(currentVideoObjectUrl);
-                currentVideoObjectUrl = null;
-            }
         }
 
         async function handleLogout(event) {

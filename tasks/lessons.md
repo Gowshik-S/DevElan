@@ -17,3 +17,6 @@
 - If the user explicitly asks to remove localhost completely, remove all localhost/127 references from frontend source and error paths, not just runtime fallbacks.
 - If a user escalates from roadmap language ("2-4 weeks") to an explicit "implement this" request, switch immediately to an additive production-safe implementation path instead of proposing only guidance.
 - For upload stalls that happen to all users at the same early percentage, always check edge proxy/CDN body-size limits (e.g., Cloudflare) and add adaptive chunk sizing around HTTP 413.
+- Chunk sizes that are too small improve reliability but can heavily reduce throughput on higher-latency tunnels; use adaptive chunk growth on success and adaptive downshift on failure.
+- Persistent success overlays on upload cards can accidentally block future replacement uploads; keep overlays temporary and preserve explicit replace controls.
+- When meeting and demo uploads share backend mechanics, keep telemetry UX parity (progress %, speed, ETA) across both to avoid feature drift.

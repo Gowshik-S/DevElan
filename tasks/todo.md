@@ -248,4 +248,52 @@
 - Kept legacy one-shot upload endpoints unchanged for backward compatibility.
 - Updated `Frontend/user_home.html` meeting/demo upload actions to use chunked resumable API with deterministic upload keys, server-offset reconciliation, per-chunk retries, and cancel/offline abort handling.
 - Tuned chunk strategy for edge proxies (including Cloudflare Tunnel free): default chunk is now 512 KB with adaptive downshift on HTTP 413 response.
+- Added adaptive throughput tuning: chunk size now scales up to 2 MB after stable chunk streaks and scales down to 64 KB on gateway or transport instability.
 - Verified via OpenAPI route smoke test and end-to-end chunked resume script (`start -> chunk -> start(resume) -> chunk -> complete`) returning success.
+
+## Admin Video Streaming Playback Plan (2026-04-06)
+
+- [x] Add backend short-lived stream-token endpoint for authorized video playback
+- [x] Update backend video stream route to accept stream token query auth for HTML5 video element requests
+- [x] Replace admin modal blob download flow with direct stream URL playback so browser can range-buffer
+- [x] Validate route behavior and page render markers with smoke checks
+- [x] Add implementation review notes
+
+### Admin Video Streaming Playback Review (2026-04-06)
+
+- Added `GET /api/v1/video/stream-token/{video_id}` to issue short-lived stream tokens after normal authorization and access checks.
+- Updated `GET /api/v1/video/stream/{video_id}` to accept short-lived stream token query auth (`st`) for HTML5 video playback requests while preserving bearer-header support.
+- Reworked admin submissions modal playback to avoid `response.blob()` and object URL buffering; playback now uses direct stream URL with token query so the browser can range-buffer and start quickly.
+- Verified smoke markers in rendered `/submissions` page: stream-token call present, blob buffering removed, direct stream URL path present.
+- Verified range behavior end-to-end with a generated video asset: stream request returns `206`, `accept-ranges: bytes`, and `content-range` header for partial content delivery.
+
+## User Video Replacement Plan (2026-04-06)
+
+- [x] Allow meeting/demo uploads to replace prior video records of the same type
+- [x] Prevent UI lock after prior upload so users can upload replacement files immediately
+- [x] Keep submission status logic stable while replacing assets
+- [x] Validate replacement behavior for both meeting and demo uploads with smoke checks
+
+### User Video Replacement Review (2026-04-06)
+
+- Added backend replacement handling in submission routes so uploading a new meeting/demo video removes previous same-kind asset records for the same submission and cleans up replaced files on disk.
+- Applied replacement handling to both one-shot and resumable completion paths, preserving existing route contracts.
+- Updated student upload UI to keep upload controls available after prior uploads, including explicit replace guidance and dynamic button labels (`Upload` -> `Replace`).
+- Replaced persistent success overlays with short-lived overlays so cards are no longer blocked after successful upload.
+- Verified replacement with end-to-end tests:
+	- meeting replace: second upload leaves exactly one meeting asset (`meeting_two.mp4`)
+	- demo replace: second upload leaves exactly one demo asset (`demo_two.mp4`) and meeting asset remains intact.
+
+## Demo Upload Progress Parity (2026-04-06)
+
+- [x] Add live progress widget in demo upload section (percent, MB, speed, ETA)
+- [x] Wire demo upload callback to update progress and status text continuously
+- [x] Keep demo progress reset/show/hide and completion behavior consistent with meeting upload
+- [x] Validate rendered page markers for demo progress UI and callback wiring
+
+### Demo Upload Progress Parity Review (2026-04-06)
+
+- Added a dedicated progress panel in the demo card and connected it to resumable upload progress updates.
+- Demo upload now displays `Uploading X% (uploaded/total MB) • speed MB/s` and ETA while uploading.
+- Added demo progress lifecycle helpers (`reset/show/hide/complete`) and invoked them on file selection, upload start, success, and failure paths.
+- Verified via render checks that demo progress markup, functions, and live callback wiring are present.

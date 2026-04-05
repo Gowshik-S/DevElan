@@ -715,6 +715,16 @@
                 <div class="input-group" style="flex: 1; display: flex; flex-direction: column;"><label>Demo Recording (Optional)</label><div class="upload-box"><span id="demoFileText">Select Demo Recording</span><input type="file" id="demoVideoUpload" title="Select demo recording" accept="video/*" onchange="updateDemoFileName()"></div></div>
                 <p class="upload-hint">Accepted formats: {{ (allowed_video_extensions | default(['.mp4', '.mov', '.mkv', '.webm', '.avi'])) | join(', ') }} • Max {{ max_upload_size_mb | default(200) }} MB</p>
                 <button class="btn-submit" id="demoVideoSubmitBtn" onclick="submitDemoVideo()">Upload Demo Video</button>
+                <div class="upload-progress" id="demoUploadProgress" aria-live="polite">
+                    <div class="upload-progress-track">
+                        <div class="upload-progress-fill" id="demoUploadProgressFill"></div>
+                    </div>
+                    <div class="upload-progress-meta">
+                        <span id="demoUploadProgressPercent">0.0%</span>
+                        <span id="demoUploadProgressStats">0.0/0.0 MB • 0.00 MB/s</span>
+                    </div>
+                    <div class="upload-progress-eta" id="demoUploadEta">ETA: --</div>
+                </div>
                 <p id="demoVideoMessage" style="font-size:0.75rem;font-weight:700;color:var(--muted-blue);"></p>
                 <div class="submitted-overlay" id="demoVideoSuccess"><div class="checkmark-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg></div><div class="submitted-text">Uploaded</div></div>
             </div>
@@ -757,8 +767,10 @@
         const OFFLINE_RETRY_DELAY_MS = 1500;
         const UPLOAD_STALL_TIMEOUT_MS = 120000;
         const UPLOAD_REQUEST_TIMEOUT_MS = 45 * 60 * 1000;
-        const RESUMABLE_MIN_CHUNK_SIZE_BYTES = 256 * 1024;
+        const RESUMABLE_MIN_CHUNK_SIZE_BYTES = 64 * 1024;
         const RESUMABLE_CHUNK_SIZE_BYTES = 512 * 1024;
+        const RESUMABLE_MAX_CHUNK_SIZE_BYTES = 2 * 1024 * 1024;
+        const RESUMABLE_CHUNK_GROWTH_SUCCESS_STREAK = 3;
         const RESUMABLE_MAX_CHUNK_ATTEMPTS = 6;
         const RETRYABLE_HTTP_STATUS = new Set([408, 409, 425, 429, 500, 502, 503, 504]);
         const rawAllowedVideoExtensions = String(document.body?.dataset?.allowedVideoExtensions || '');
@@ -780,7 +792,14 @@
         const videoUploadProgressStats = document.getElementById('videoUploadProgressStats');
         const videoUploadEta = document.getElementById('videoUploadEta');
         const videoUploadCancelBtn = document.getElementById('videoUploadCancelBtn');
+        const demoUploadProgress = document.getElementById('demoUploadProgress');
+        const demoUploadProgressFill = document.getElementById('demoUploadProgressFill');
+        const demoUploadProgressPercent = document.getElementById('demoUploadProgressPercent');
+        const demoUploadProgressStats = document.getElementById('demoUploadProgressStats');
+        const demoUploadEta = document.getElementById('demoUploadEta');
         let activeVideoUploadState = null;
+        let hasExistingMeetingVideo = false;
+        let hasExistingDemoVideo = false;
 
         function getApiRoots() {
             const merged = [activeApiRoot, ...API_ROOTS];
@@ -848,6 +867,13 @@
 
         function formatMegabytes(bytes) {
             return (bytes / (1024 * 1024)).toFixed(1);
+        }
+
+        function formatChunkSize(bytes) {
+            if (bytes >= 1024 * 1024) {
+                return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+            }
+            return `${Math.max(Math.floor(bytes / 1024), 1)} KB`;
         }
 
         function getFileExtension(fileName) {
@@ -1135,8 +1161,12 @@
 
                 let chunkSize = Math.max(
                     RESUMABLE_MIN_CHUNK_SIZE_BYTES,
-                    Number(session.chunk_size_bytes || RESUMABLE_CHUNK_SIZE_BYTES)
+                    Math.min(
+                        RESUMABLE_MAX_CHUNK_SIZE_BYTES,
+                        Number(session.chunk_size_bytes || RESUMABLE_CHUNK_SIZE_BYTES)
+                    )
                 );
+                let successfulChunkStreak = 0;
                 uploadedBytes = Math.min(Number(session.received_bytes || 0), videoFile.size);
 
                 if (uploadedBytes > 0 && uploadedBytes < videoFile.size) {
@@ -1194,16 +1224,34 @@
 
                             if (error && error.isOffsetMismatch) {
                                 uploadedBytes = Math.min(Number(error.serverReceivedBytes || 0), videoFile.size);
+                                successfulChunkStreak = 0;
                                 chunkAccepted = true;
                                 break;
                             }
 
                             if (error && Number(error.status) === 413 && chunkSize > RESUMABLE_MIN_CHUNK_SIZE_BYTES) {
                                 chunkSize = Math.max(RESUMABLE_MIN_CHUNK_SIZE_BYTES, Math.floor(chunkSize / 2));
-                                const chunkKb = Math.max(Math.floor(chunkSize / 1024), 1);
+                                successfulChunkStreak = 0;
                                 setMessage(
                                     messageTargetId,
-                                    `Upload gateway limit detected. Reducing chunk size to ${chunkKb} KB and retrying...`,
+                                    `Upload gateway limit detected. Reducing chunk size to ${formatChunkSize(chunkSize)} and retrying...`,
+                                    true
+                                );
+                                shouldRetryWithSmallerChunk = true;
+                                break;
+                            }
+
+                            const unstableTransportError = error
+                                && (
+                                    error.message === 'NETWORK_ERROR'
+                                    || /timed out|stalled|connection lost/i.test(String(error.message || ''))
+                                );
+                            if (unstableTransportError && chunkSize > RESUMABLE_MIN_CHUNK_SIZE_BYTES) {
+                                chunkSize = Math.max(RESUMABLE_MIN_CHUNK_SIZE_BYTES, Math.floor(chunkSize / 2));
+                                successfulChunkStreak = 0;
+                                setMessage(
+                                    messageTargetId,
+                                    `Network instability detected. Reducing chunk size to ${formatChunkSize(chunkSize)} and retrying...`,
                                     true
                                 );
                                 shouldRetryWithSmallerChunk = true;
@@ -1231,6 +1279,19 @@
 
                     if (!chunkAccepted) {
                         throw new Error('Could not upload chunk after multiple attempts.');
+                    }
+
+                    successfulChunkStreak += 1;
+                    if (
+                        successfulChunkStreak >= RESUMABLE_CHUNK_GROWTH_SUCCESS_STREAK
+                        && chunkSize < RESUMABLE_MAX_CHUNK_SIZE_BYTES
+                    ) {
+                        chunkSize = Math.min(RESUMABLE_MAX_CHUNK_SIZE_BYTES, chunkSize * 2);
+                        successfulChunkStreak = 0;
+                        setMessage(
+                            messageTargetId,
+                            `Network stable. Increasing chunk size to ${formatChunkSize(chunkSize)} for better speed...`
+                        );
                     }
 
                     const elapsedSeconds = Math.max((Date.now() - startedAtMs) / 1000, 0.1);
@@ -1318,6 +1379,37 @@
             }
         }
 
+        function getMeetingVideoButtonLabel() {
+            return hasExistingMeetingVideo ? 'Replace Meeting Video' : 'Upload Meeting Video';
+        }
+
+        function getDemoVideoButtonLabel() {
+            return hasExistingDemoVideo ? 'Replace Demo Video' : 'Upload Demo Video';
+        }
+
+        function syncVideoUploadButtonLabels() {
+            const meetingButton = document.getElementById('videoSubmitBtn');
+            const demoButton = document.getElementById('demoVideoSubmitBtn');
+            if (meetingButton && !meetingButton.disabled) {
+                meetingButton.textContent = getMeetingVideoButtonLabel();
+            }
+            if (demoButton && !demoButton.disabled) {
+                demoButton.textContent = getDemoVideoButtonLabel();
+            }
+        }
+
+        function showSubmissionOverlayTemporarily(overlayId, durationMs = 1000) {
+            const overlay = document.getElementById(overlayId);
+            if (!overlay) {
+                return;
+            }
+
+            overlay.style.display = 'flex';
+            window.setTimeout(() => {
+                overlay.style.display = 'none';
+            }, durationMs);
+        }
+
         function markVideoUploadCompleted() {
             if (videoUploadProgress) {
                 videoUploadProgress.classList.add('complete');
@@ -1353,6 +1445,76 @@
                     videoUploadEta.textContent = `ETA: ${formatEta(etaSeconds)}`;
                 } else {
                     videoUploadEta.textContent = 'ETA: calculating...';
+                }
+            }
+        }
+
+        function resetDemoUploadProgress() {
+            if (demoUploadProgressFill) {
+                demoUploadProgressFill.style.width = '0%';
+            }
+            if (demoUploadProgressPercent) {
+                demoUploadProgressPercent.textContent = '0.0%';
+            }
+            if (demoUploadProgressStats) {
+                demoUploadProgressStats.textContent = '0.0/0.0 MB • 0.00 MB/s';
+            }
+            if (demoUploadEta) {
+                demoUploadEta.textContent = 'ETA: --';
+            }
+            if (demoUploadProgress) {
+                demoUploadProgress.classList.remove('complete');
+            }
+        }
+
+        function showDemoUploadProgress() {
+            if (demoUploadProgress) {
+                demoUploadProgress.classList.add('active');
+            }
+        }
+
+        function hideDemoUploadProgress() {
+            if (demoUploadProgress) {
+                demoUploadProgress.classList.remove('active');
+                demoUploadProgress.classList.remove('complete');
+            }
+        }
+
+        function markDemoUploadCompleted() {
+            if (demoUploadProgress) {
+                demoUploadProgress.classList.add('complete');
+            }
+            if (demoUploadEta) {
+                demoUploadEta.textContent = 'ETA: done';
+            }
+        }
+
+        function updateDemoUploadProgressView(progress) {
+            const clampedPercent = Math.max(0, Math.min(progress.progressPercent || 0, 100));
+            const uploadedMb = formatMegabytes(progress.uploadedBytes || 0);
+            const totalMb = formatMegabytes(progress.totalBytes || 0);
+            const speedMbps = ((progress.speedBytesPerSecond || 0) / (1024 * 1024)).toFixed(2);
+            const remainingBytes = Math.max((progress.totalBytes || 0) - (progress.uploadedBytes || 0), 0);
+            const etaSeconds = (progress.speedBytesPerSecond || 0) > 0
+                ? remainingBytes / progress.speedBytesPerSecond
+                : Number.POSITIVE_INFINITY;
+
+            if (demoUploadProgressFill) {
+                demoUploadProgressFill.style.width = `${clampedPercent.toFixed(1)}%`;
+            }
+            if (demoUploadProgressPercent) {
+                demoUploadProgressPercent.textContent = `${clampedPercent.toFixed(1)}%`;
+            }
+            if (demoUploadProgressStats) {
+                demoUploadProgressStats.textContent = `${uploadedMb}/${totalMb} MB • ${speedMbps} MB/s`;
+            }
+            if (demoUploadEta) {
+                if (clampedPercent >= 100) {
+                    demoUploadEta.textContent = 'ETA: done';
+                } else if (Number.isFinite(etaSeconds)) {
+                    demoUploadEta.textContent = `ETA: ${formatEta(etaSeconds)}`;
+                } else {
+                    demoUploadEta.textContent = 'ETA: calculating...';
                 }
             }
         }
@@ -1696,8 +1858,20 @@
         }
 
         async function loadSubmissionState() {
+            hasExistingMeetingVideo = false;
+            hasExistingDemoVideo = false;
+            const meetingOverlay = document.getElementById('videoSuccess');
+            const demoOverlay = document.getElementById('demoVideoSuccess');
+            if (meetingOverlay) {
+                meetingOverlay.style.display = 'none';
+            }
+            if (demoOverlay) {
+                demoOverlay.style.display = 'none';
+            }
+
             const result = await apiFetch(`/submission/get?use_case_id=${encodeURIComponent(String(activeUseCaseId))}`);
             if (!Array.isArray(result) || result.length === 0) {
+                syncVideoUploadButtonLabels();
                 return;
             }
 
@@ -1707,15 +1881,20 @@
             }
             const meetingVideoId = current.meeting_video_id || current.video_id;
             const demoVideoId = current.demo_video_id;
+            hasExistingMeetingVideo = Boolean(meetingVideoId);
+            hasExistingDemoVideo = Boolean(demoVideoId);
+            syncVideoUploadButtonLabels();
 
             if (meetingVideoId) {
-                document.getElementById('videoSuccess').style.display = 'flex';
-                setMessage('videoMessage', 'Meeting video already uploaded.');
+                setMessage('videoMessage', 'Meeting video already uploaded. Upload a new file to replace it.');
+            } else {
+                setMessage('videoMessage', '');
             }
 
             if (demoVideoId) {
-                document.getElementById('demoVideoSuccess').style.display = 'flex';
-                setMessage('demoVideoMessage', 'Demo video already uploaded (optional).');
+                setMessage('demoVideoMessage', 'Demo video already uploaded. Upload a new file to replace it.');
+            } else {
+                setMessage('demoVideoMessage', '');
             }
             setMessage('repoMessage', `Current status: ${String(current.status || '').toUpperCase()}`);
         }
@@ -1785,6 +1964,8 @@
         function updateDemoFileName() {
             const input = document.getElementById('demoVideoUpload');
             const label = document.getElementById('demoFileText');
+            hideDemoUploadProgress();
+            resetDemoUploadProgress();
 
             if (input.files.length > 0) {
                 const selectedFile = input.files[0];
@@ -1835,7 +2016,7 @@
                         repo_url: gitUrl,
                     }),
                 });
-                document.getElementById('repoSuccess').style.display = 'flex';
+                showSubmissionOverlayTemporarily('repoSuccess');
                 setMessage('repoMessage', 'Repository linked successfully.');
             } catch (error) {
                 setMessage('repoMessage', error.message || 'Could not submit repository URL.', true);
@@ -1876,6 +2057,7 @@
             button.textContent = 'Uploading...';
             button.disabled = true;
             document.getElementById('videoSuccess').style.display = 'none';
+            const replacingMeetingVideo = hasExistingMeetingVideo;
             resetVideoUploadProgress();
             showVideoUploadProgress();
             showVideoUploadCancel();
@@ -1902,14 +2084,20 @@
                 });
                 markVideoUploadCompleted();
                 await new Promise((resolve) => setTimeout(resolve, 850));
-                document.getElementById('videoSuccess').style.display = 'flex';
-                setMessage('videoMessage', 'Meeting video uploaded successfully.');
+                hasExistingMeetingVideo = true;
+                showSubmissionOverlayTemporarily('videoSuccess');
+                setMessage(
+                    'videoMessage',
+                    replacingMeetingVideo
+                        ? 'Meeting video replaced successfully.'
+                        : 'Meeting video uploaded successfully.'
+                );
             } catch (error) {
                 hideVideoUploadProgress();
                 setMessage('videoMessage', error.message || 'Could not upload meeting video.', true);
             } finally {
                 hideVideoUploadCancel();
-                button.textContent = 'Upload Meeting Video';
+                button.textContent = getMeetingVideoButtonLabel();
                 button.disabled = false;
             }
         }
@@ -1945,19 +2133,46 @@
             button.textContent = 'Uploading...';
             button.disabled = true;
             document.getElementById('demoVideoSuccess').style.display = 'none';
+            const replacingDemoVideo = hasExistingDemoVideo;
+            resetDemoUploadProgress();
+            showDemoUploadProgress();
             setMessage('demoVideoMessage', 'Uploading demo video...');
 
             try {
-                await uploadVideoWithResumableProgress('demo', activeUseCaseId, selectedFile, null, {
+                await uploadVideoWithResumableProgress('demo', activeUseCaseId, selectedFile, (progress) => {
+                    updateDemoUploadProgressView(progress);
+                    const uploadedMb = formatMegabytes(progress.uploadedBytes || 0);
+                    const totalMb = formatMegabytes(progress.totalBytes || 0);
+                    const speedMbps = ((progress.speedBytesPerSecond || 0) / (1024 * 1024)).toFixed(2);
+                    setMessage(
+                        'demoVideoMessage',
+                        `Uploading ${progress.progressPercent.toFixed(1)}% (${uploadedMb}/${totalMb} MB) • ${speedMbps} MB/s`
+                    );
+                }, {
                     messageTargetId: 'demoVideoMessage',
                     maxAttempts: MAX_UPLOAD_ATTEMPTS,
                 });
-                document.getElementById('demoVideoSuccess').style.display = 'flex';
-                setMessage('demoVideoMessage', 'Demo video uploaded successfully (optional).');
+                updateDemoUploadProgressView({
+                    uploadedBytes: selectedFile.size,
+                    totalBytes: selectedFile.size,
+                    speedBytesPerSecond: 0,
+                    progressPercent: 100,
+                });
+                markDemoUploadCompleted();
+                await new Promise((resolve) => setTimeout(resolve, 850));
+                hasExistingDemoVideo = true;
+                showSubmissionOverlayTemporarily('demoVideoSuccess');
+                setMessage(
+                    'demoVideoMessage',
+                    replacingDemoVideo
+                        ? 'Demo video replaced successfully (optional).'
+                        : 'Demo video uploaded successfully (optional).'
+                );
             } catch (error) {
+                hideDemoUploadProgress();
                 setMessage('demoVideoMessage', error.message || 'Could not upload demo video.', true);
             } finally {
-                button.textContent = 'Upload Demo Video';
+                button.textContent = getDemoVideoButtonLabel();
                 button.disabled = false;
             }
         }
@@ -2026,6 +2241,7 @@
 
         window.addEventListener('offline', handleOfflineDuringUpload);
 
+        syncVideoUploadButtonLabels();
         initializeStudentHome();
     </script>
 </body>
