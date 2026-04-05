@@ -730,11 +730,6 @@
                 : '';
             const explicitApiRoot = String(window.DEVELA_API_ROOT || '').trim();
             const normalizedExplicitApiRoot = explicitApiRoot ? explicitApiRoot.replace(/\/+$/, '') : '';
-            const isLocalOrigin = !origin
-                || origin.startsWith('http://localhost')
-                || origin.startsWith('http://127.0.0.1')
-                || origin.startsWith('https://localhost')
-                || origin.startsWith('https://127.0.0.1');
 
             if (normalizedExplicitApiRoot) {
                 candidates.push(normalizedExplicitApiRoot);
@@ -742,12 +737,6 @@
 
             if (origin) {
                 candidates.push(`${origin}/api/v1`);
-            }
-
-            // Keep localhost fallbacks for local development only.
-            if (isLocalOrigin) {
-                candidates.push('http://127.0.0.1:8000/api/v1');
-                candidates.push('http://localhost:8000/api/v1');
             }
 
             return candidates.filter((value, index, list) => value && list.indexOf(value) === index);
@@ -762,6 +751,16 @@
         const MAX_VIDEO_SIZE_MB = Number('{{ max_upload_size_mb | default(200) }}') || DEFAULT_MAX_VIDEO_SIZE_MB;
         const MAX_VIDEO_SIZE_BYTES = MAX_VIDEO_SIZE_MB * 1024 * 1024;
         const DEFAULT_ALLOWED_VIDEO_EXTENSIONS = ['.mp4', '.mov', '.mkv', '.webm', '.avi'];
+        const MAX_UPLOAD_ATTEMPTS = 4;
+        const RETRY_BASE_DELAY_MS = 1000;
+        const RETRY_MAX_DELAY_MS = 15000;
+        const OFFLINE_RETRY_DELAY_MS = 1500;
+        const UPLOAD_STALL_TIMEOUT_MS = 120000;
+        const UPLOAD_REQUEST_TIMEOUT_MS = 45 * 60 * 1000;
+        const RESUMABLE_MIN_CHUNK_SIZE_BYTES = 256 * 1024;
+        const RESUMABLE_CHUNK_SIZE_BYTES = 512 * 1024;
+        const RESUMABLE_MAX_CHUNK_ATTEMPTS = 6;
+        const RETRYABLE_HTTP_STATUS = new Set([408, 409, 425, 429, 500, 502, 503, 504]);
         const rawAllowedVideoExtensions = String(document.body?.dataset?.allowedVideoExtensions || '');
         const ALLOWED_VIDEO_EXTENSIONS = (() => {
             const fromTemplate = rawAllowedVideoExtensions
@@ -871,6 +870,393 @@
             return `Unsupported video format. Accepted formats: ${ALLOWED_VIDEO_EXTENSIONS_LABEL}.`;
         }
 
+        function sleep(ms) {
+            return new Promise((resolve) => setTimeout(resolve, ms));
+        }
+
+        function computeRetryDelayMs(attemptNumber) {
+            const exponentialDelay = RETRY_BASE_DELAY_MS * (2 ** Math.max(attemptNumber - 1, 0));
+            const cappedDelay = Math.min(exponentialDelay, RETRY_MAX_DELAY_MS);
+            return Math.floor(Math.random() * cappedDelay);
+        }
+
+        async function waitUntilOnline(messageTargetId) {
+            if (typeof navigator === 'undefined' || navigator.onLine !== false) {
+                return;
+            }
+
+            setMessage(messageTargetId, 'You are offline. Waiting for network to resume...', true);
+            await new Promise((resolve) => {
+                const handleOnline = () => {
+                    window.removeEventListener('online', handleOnline);
+                    resolve();
+                };
+                window.addEventListener('online', handleOnline);
+            });
+            await sleep(OFFLINE_RETRY_DELAY_MS);
+        }
+
+        function isRetryableUploadError(error) {
+            if (!error) {
+                return false;
+            }
+            if (error.isCancelled || error.isAuthError) {
+                return false;
+            }
+            if (error.isRetryable) {
+                return true;
+            }
+            if (error.isHttpError && RETRYABLE_HTTP_STATUS.has(Number(error.status))) {
+                return true;
+            }
+            return error.message === 'NETWORK_ERROR';
+        }
+
+        function buildResumableUploadKey(uploadKind, useCaseId, file) {
+            return [
+                String(uploadKind || 'meeting').trim().toLowerCase(),
+                String(useCaseId || '').trim(),
+                String(file?.name || '').trim().toLowerCase(),
+                String(file?.size || 0),
+                String(file?.lastModified || 0),
+            ].join('|');
+        }
+
+        function extractErrorMessageFromDetail(detail, fallbackMessage) {
+            if (typeof detail === 'string' && detail.trim()) {
+                return detail;
+            }
+            if (detail && typeof detail === 'object' && typeof detail.message === 'string' && detail.message.trim()) {
+                return detail.message;
+            }
+            return fallbackMessage;
+        }
+
+        function buildHttpRequestError(response, payload, fallbackMessage) {
+            const detail = payload && Object.prototype.hasOwnProperty.call(payload, 'detail')
+                ? payload.detail
+                : null;
+            const error = new Error(
+                extractErrorMessageFromDetail(detail, fallbackMessage || `Request failed (${response.status}).`)
+            );
+            error.isHttpError = true;
+            error.status = response.status;
+            error.detail = detail;
+            error.isRetryable = RETRYABLE_HTTP_STATUS.has(Number(response.status));
+            if (response.status === 401) {
+                error.isAuthError = true;
+            }
+            return error;
+        }
+
+        async function authFetchWithFallback(path, options = {}, uploadState = null) {
+            const token = getToken();
+            if (!token) {
+                clearSession();
+                throw new Error('Missing authentication token.');
+            }
+
+            const headers = {
+                ...(options.headers || {}),
+                Authorization: `Bearer ${token}`,
+            };
+
+            const candidates = getApiRoots();
+            let lastNetworkError = null;
+
+            for (const candidate of candidates) {
+                const controller = new AbortController();
+                if (uploadState) {
+                    uploadState.abortController = controller;
+                }
+
+                try {
+                    const response = await fetch(`${candidate}${path}`, {
+                        ...options,
+                        headers,
+                        signal: controller.signal,
+                    });
+                    activeApiRoot = candidate;
+                    localStorage.setItem('devela-api-root', candidate);
+                    return response;
+                } catch (error) {
+                    if (uploadState?.cancelled) {
+                        const cancelledError = new Error('Upload cancelled by user.');
+                        cancelledError.isCancelled = true;
+                        throw cancelledError;
+                    }
+
+                    if (error && error.name === 'AbortError') {
+                        if (uploadState?.abortReason === 'offline') {
+                            const offlineError = new Error('Connection lost while uploading.');
+                            offlineError.isRetryable = true;
+                            throw offlineError;
+                        }
+                        const cancelledError = new Error('Upload cancelled by user.');
+                        cancelledError.isCancelled = true;
+                        throw cancelledError;
+                    }
+
+                    lastNetworkError = error;
+                } finally {
+                    if (uploadState && uploadState.abortController === controller) {
+                        uploadState.abortController = null;
+                    }
+                }
+            }
+
+            const backendError = new Error(`Unable to reach backend at ${candidates.join(' or ')}.`);
+            backendError.isRetryable = true;
+            backendError.cause = lastNetworkError || null;
+            throw backendError;
+        }
+
+        async function startResumableUploadSession(uploadKind, useCaseId, file, uploadState) {
+            const response = await authFetchWithFallback('/submission/resumable/start', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    use_case_id: String(useCaseId),
+                    upload_kind: uploadKind,
+                    upload_key: buildResumableUploadKey(uploadKind, useCaseId, file),
+                    file_name: file.name,
+                    file_size_bytes: file.size,
+                    content_type: file.type || null,
+                    preferred_chunk_size_bytes: RESUMABLE_CHUNK_SIZE_BYTES,
+                }),
+            }, uploadState);
+
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                const error = buildHttpRequestError(response, payload, `Could not start upload session (${response.status}).`);
+                if (error.isAuthError) {
+                    clearSession();
+                }
+                throw error;
+            }
+
+            return payload;
+        }
+
+        async function sendResumableUploadChunk(uploadId, offset, chunkBlob, uploadState) {
+            const response = await authFetchWithFallback(
+                `/submission/resumable/${encodeURIComponent(uploadId)}/chunk`,
+                {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/octet-stream',
+                        'X-Upload-Offset': String(offset),
+                    },
+                    body: chunkBlob,
+                },
+                uploadState
+            );
+
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                const error = buildHttpRequestError(response, payload, `Chunk upload failed (${response.status}).`);
+                if (error.isAuthError) {
+                    clearSession();
+                }
+
+                if (error.status === 409 && error.detail && typeof error.detail === 'object') {
+                    const detailCode = String(error.detail.code || '').toUpperCase();
+                    if (detailCode === 'UPLOAD_OFFSET_MISMATCH') {
+                        error.isOffsetMismatch = true;
+                        error.serverReceivedBytes = Number(error.detail.received_bytes || 0);
+                    }
+                }
+
+                throw error;
+            }
+
+            return payload;
+        }
+
+        async function completeResumableUpload(uploadId, uploadState) {
+            const response = await authFetchWithFallback(
+                `/submission/resumable/${encodeURIComponent(uploadId)}/complete`,
+                {
+                    method: 'POST',
+                },
+                uploadState
+            );
+
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                const error = buildHttpRequestError(response, payload, `Upload finalize failed (${response.status}).`);
+                if (error.isAuthError) {
+                    clearSession();
+                }
+                throw error;
+            }
+
+            return payload;
+        }
+
+        async function cancelResumableUploadSession(uploadId) {
+            if (!uploadId) {
+                return;
+            }
+
+            try {
+                await apiFetch(`/submission/resumable/${encodeURIComponent(uploadId)}`, {
+                    method: 'DELETE',
+                });
+            } catch (_) {
+                // Ignore cleanup failures triggered during local cancel requests.
+            }
+        }
+
+        async function uploadVideoWithResumableProgress(uploadKind, useCaseId, videoFile, onProgress, options = {}) {
+            const messageTargetId = options.messageTargetId || 'videoMessage';
+            const maxChunkAttempts = Math.max(
+                Number(options.maxChunkAttempts || options.maxAttempts || RESUMABLE_MAX_CHUNK_ATTEMPTS),
+                1
+            );
+            const uploadState = {
+                cancelled: false,
+                abortReason: null,
+                abortController: null,
+                uploadId: null,
+                messageTargetId,
+            };
+            activeVideoUploadState = uploadState;
+
+            const startedAtMs = Date.now();
+            let uploadedBytes = 0;
+
+            try {
+                await waitUntilOnline(messageTargetId);
+                const session = await startResumableUploadSession(uploadKind, useCaseId, videoFile, uploadState);
+                uploadState.uploadId = String(session.upload_id || '').trim();
+
+                let chunkSize = Math.max(
+                    RESUMABLE_MIN_CHUNK_SIZE_BYTES,
+                    Number(session.chunk_size_bytes || RESUMABLE_CHUNK_SIZE_BYTES)
+                );
+                uploadedBytes = Math.min(Number(session.received_bytes || 0), videoFile.size);
+
+                if (uploadedBytes > 0 && uploadedBytes < videoFile.size) {
+                    setMessage(
+                        messageTargetId,
+                        `Resuming upload from ${formatMegabytes(uploadedBytes)} MB of ${formatMegabytes(videoFile.size)} MB...`
+                    );
+                }
+
+                if (typeof onProgress === 'function') {
+                    const initialElapsedSeconds = Math.max((Date.now() - startedAtMs) / 1000, 0.1);
+                    const initialSpeed = uploadedBytes > 0
+                        ? uploadedBytes / initialElapsedSeconds
+                        : 0;
+                    onProgress({
+                        uploadedBytes,
+                        totalBytes: videoFile.size,
+                        speedBytesPerSecond: initialSpeed,
+                        progressPercent: videoFile.size > 0 ? (uploadedBytes / videoFile.size) * 100 : 0,
+                    });
+                }
+
+                while (uploadedBytes < videoFile.size) {
+                    if (uploadState.cancelled) {
+                        const cancelledError = new Error('Upload cancelled by user.');
+                        cancelledError.isCancelled = true;
+                        throw cancelledError;
+                    }
+
+                    await waitUntilOnline(messageTargetId);
+                    const nextChunkEnd = Math.min(uploadedBytes + chunkSize, videoFile.size);
+                    const chunkBlob = videoFile.slice(uploadedBytes, nextChunkEnd);
+
+                    let chunkAccepted = false;
+                    let shouldRetryWithSmallerChunk = false;
+                    for (let attempt = 1; attempt <= maxChunkAttempts; attempt += 1) {
+                        try {
+                            const chunkResult = await sendResumableUploadChunk(
+                                uploadState.uploadId,
+                                uploadedBytes,
+                                chunkBlob,
+                                uploadState
+                            );
+                            uploadedBytes = Math.min(Number(chunkResult.received_bytes || nextChunkEnd), videoFile.size);
+                            chunkAccepted = true;
+                            break;
+                        } catch (error) {
+                            if (uploadState.cancelled || (error && error.isCancelled)) {
+                                throw error;
+                            }
+
+                            if (error && error.isAuthError) {
+                                throw error;
+                            }
+
+                            if (error && error.isOffsetMismatch) {
+                                uploadedBytes = Math.min(Number(error.serverReceivedBytes || 0), videoFile.size);
+                                chunkAccepted = true;
+                                break;
+                            }
+
+                            if (error && Number(error.status) === 413 && chunkSize > RESUMABLE_MIN_CHUNK_SIZE_BYTES) {
+                                chunkSize = Math.max(RESUMABLE_MIN_CHUNK_SIZE_BYTES, Math.floor(chunkSize / 2));
+                                const chunkKb = Math.max(Math.floor(chunkSize / 1024), 1);
+                                setMessage(
+                                    messageTargetId,
+                                    `Upload gateway limit detected. Reducing chunk size to ${chunkKb} KB and retrying...`,
+                                    true
+                                );
+                                shouldRetryWithSmallerChunk = true;
+                                break;
+                            }
+
+                            if (!isRetryableUploadError(error) || attempt >= maxChunkAttempts) {
+                                throw error;
+                            }
+
+                            const retryDelayMs = computeRetryDelayMs(attempt + 1);
+                            const retryDelaySeconds = Math.max(Math.ceil(retryDelayMs / 1000), 1);
+                            setMessage(
+                                messageTargetId,
+                                `Network unstable. Retrying chunk (${attempt + 1}/${maxChunkAttempts}) in ${retryDelaySeconds}s...`,
+                                true
+                            );
+                            await sleep(retryDelayMs);
+                        }
+                    }
+
+                    if (shouldRetryWithSmallerChunk) {
+                        continue;
+                    }
+
+                    if (!chunkAccepted) {
+                        throw new Error('Could not upload chunk after multiple attempts.');
+                    }
+
+                    const elapsedSeconds = Math.max((Date.now() - startedAtMs) / 1000, 0.1);
+                    const speedBytesPerSecond = uploadedBytes / elapsedSeconds;
+                    const progressPercent = videoFile.size > 0
+                        ? Math.min((uploadedBytes / videoFile.size) * 100, 100)
+                        : 0;
+
+                    if (typeof onProgress === 'function') {
+                        onProgress({
+                            uploadedBytes,
+                            totalBytes: videoFile.size,
+                            speedBytesPerSecond,
+                            progressPercent,
+                        });
+                    }
+                }
+
+                return await completeResumableUpload(uploadState.uploadId, uploadState);
+            } finally {
+                if (activeVideoUploadState === uploadState) {
+                    activeVideoUploadState = null;
+                }
+            }
+        }
+
         function formatEta(seconds) {
             if (!Number.isFinite(seconds) || seconds <= 0) {
                 return '0s';
@@ -977,6 +1363,27 @@
                 const startedAtMs = Date.now();
                 const url = `${candidate}${path}`;
 
+                const clearStallTimer = () => {
+                    if (uploadState && uploadState.stallTimer) {
+                        clearTimeout(uploadState.stallTimer);
+                        uploadState.stallTimer = null;
+                    }
+                };
+
+                const resetStallTimer = () => {
+                    clearStallTimer();
+                    if (!uploadState || uploadState.cancelled || uploadState.uploadFinished) {
+                        return;
+                    }
+                    uploadState.stallTimer = setTimeout(() => {
+                        if (!uploadState.xhr || uploadState.xhr !== xhr || uploadState.cancelled) {
+                            return;
+                        }
+                        uploadState.abortReason = 'stalled';
+                        xhr.abort();
+                    }, UPLOAD_STALL_TIMEOUT_MS);
+                };
+
                 if (uploadState && uploadState.cancelled) {
                     const cancelledError = new Error('Upload cancelled by user.');
                     cancelledError.isCancelled = true;
@@ -986,15 +1393,24 @@
 
                 xhr.open('POST', url, true);
                 xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-                xhr.timeout = 10 * 60 * 1000;
+                xhr.timeout = UPLOAD_REQUEST_TIMEOUT_MS;
                 if (uploadState) {
                     uploadState.xhr = xhr;
+                    uploadState.abortReason = null;
+                    uploadState.uploadFinished = false;
                 }
+                resetStallTimer();
+
+                xhr.upload.onloadstart = () => {
+                    resetStallTimer();
+                };
 
                 xhr.upload.onprogress = (event) => {
                     if (!event.lengthComputable) {
                         return;
                     }
+
+                    resetStallTimer();
 
                     const uploadedBytes = event.loaded;
                     const totalBytes = event.total || videoFile.size;
@@ -1012,36 +1428,67 @@
                             progressPercent,
                         });
                     }
+
+                    if (uploadState && progressPercent >= 100) {
+                        uploadState.uploadFinished = true;
+                        clearStallTimer();
+                    }
                 };
 
                 xhr.onerror = () => {
+                    clearStallTimer();
                     if (uploadState) {
                         uploadState.xhr = null;
+                        uploadState.uploadFinished = false;
                     }
-                    reject(new Error('NETWORK_ERROR'));
+                    const networkError = new Error('NETWORK_ERROR');
+                    networkError.isRetryable = true;
+                    reject(networkError);
                 };
 
                 xhr.onabort = () => {
+                    clearStallTimer();
                     if (uploadState) {
                         uploadState.xhr = null;
+                        uploadState.uploadFinished = false;
                     }
+
+                    const abortReason = uploadState?.abortReason;
+                    if (abortReason === 'stalled') {
+                        const stalledError = new Error('Upload stalled due to unstable network.');
+                        stalledError.isRetryable = true;
+                        reject(stalledError);
+                        return;
+                    }
+
+                    if (abortReason === 'offline') {
+                        const offlineError = new Error('Connection lost while uploading.');
+                        offlineError.isRetryable = true;
+                        reject(offlineError);
+                        return;
+                    }
+
                     const cancelledError = new Error('Upload cancelled by user.');
                     cancelledError.isCancelled = true;
                     reject(cancelledError);
                 };
 
                 xhr.ontimeout = () => {
+                    clearStallTimer();
                     if (uploadState) {
                         uploadState.xhr = null;
+                        uploadState.uploadFinished = false;
                     }
                     const timeoutError = new Error('Upload timed out. Check your network and retry.');
-                    timeoutError.isFinal = true;
+                    timeoutError.isRetryable = true;
                     reject(timeoutError);
                 };
 
                 xhr.onload = () => {
+                    clearStallTimer();
                     if (uploadState) {
                         uploadState.xhr = null;
+                        uploadState.uploadFinished = false;
                     }
                     const payload = (() => {
                         try {
@@ -1055,6 +1502,8 @@
                         clearSession();
                         const authError = new Error('Your session has expired. Please log in again.');
                         authError.isHttpError = true;
+                        authError.isAuthError = true;
+                        authError.status = xhr.status;
                         reject(authError);
                         return;
                     }
@@ -1066,6 +1515,8 @@
 
                     const backendError = new Error(payload.detail || `Request failed (${xhr.status}).`);
                     backendError.isHttpError = true;
+                    backendError.status = xhr.status;
+                    backendError.isRetryable = RETRYABLE_HTTP_STATUS.has(xhr.status);
                     reject(backendError);
                 };
 
@@ -1076,7 +1527,7 @@
             });
         }
 
-        async function uploadVideoWithProgress(path, useCaseId, videoFile, onProgress) {
+        async function uploadVideoWithProgress(path, useCaseId, videoFile, onProgress, options = {}) {
             const token = getToken();
             if (!token) {
                 clearSession();
@@ -1084,39 +1535,72 @@
             }
 
             const candidates = getApiRoots();
-            const uploadState = { cancelled: false, xhr: null };
+            const messageTargetId = options.messageTargetId || 'videoMessage';
+            const maxAttempts = Math.max(Number(options.maxAttempts || MAX_UPLOAD_ATTEMPTS), 1);
+            const uploadState = {
+                cancelled: false,
+                xhr: null,
+                abortReason: null,
+                stallTimer: null,
+                uploadFinished: false,
+                messageTargetId,
+            };
             activeVideoUploadState = uploadState;
+            let lastError = null;
 
             try {
-                for (const candidate of candidates) {
-                    try {
-                        const payload = await uploadVideoToCandidate(
-                            candidate,
-                            path,
-                            token,
-                            useCaseId,
-                            videoFile,
-                            onProgress,
-                            uploadState
-                        );
-                        activeApiRoot = candidate;
-                        localStorage.setItem('devela-api-root', candidate);
-                        return payload;
-                    } catch (error) {
-                        if (uploadState.cancelled || (error && error.isCancelled)) {
-                            throw error;
-                        }
-                        if (error && (error.isHttpError || error.isFinal)) {
-                            throw error;
+                for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+                    await waitUntilOnline(messageTargetId);
+
+                    for (const candidate of candidates) {
+                        try {
+                            const payload = await uploadVideoToCandidate(
+                                candidate,
+                                path,
+                                token,
+                                useCaseId,
+                                videoFile,
+                                onProgress,
+                                uploadState
+                            );
+                            activeApiRoot = candidate;
+                            localStorage.setItem('devela-api-root', candidate);
+                            return payload;
+                        } catch (error) {
+                            lastError = error;
+                            if (uploadState.cancelled || (error && error.isCancelled)) {
+                                throw error;
+                            }
+
+                            // Non-retryable HTTP/auth failures should stop immediately.
+                            if (error && error.isHttpError && !error.isRetryable) {
+                                throw error;
+                            }
                         }
                     }
+
+                    if (!isRetryableUploadError(lastError) || attempt >= maxAttempts) {
+                        throw lastError || new Error(`Unable to reach backend at ${candidates.join(' or ')}.`);
+                    }
+
+                    const retryDelayMs = computeRetryDelayMs(attempt + 1);
+                    const retryDelaySeconds = Math.max(Math.ceil(retryDelayMs / 1000), 1);
+                    setMessage(
+                        messageTargetId,
+                        `Network unstable. Retrying upload (${attempt + 1}/${maxAttempts}) in ${retryDelaySeconds}s...`,
+                        true
+                    );
+                    await sleep(retryDelayMs);
                 }
 
-                throw new Error(
-                    `Unable to reach backend at ${candidates.join(' or ')}.`
-                );
+                throw lastError || new Error(`Unable to reach backend at ${candidates.join(' or ')}.`);
             } finally {
-                activeVideoUploadState = null;
+                if (uploadState.stallTimer) {
+                    clearTimeout(uploadState.stallTimer);
+                }
+                if (activeVideoUploadState === uploadState) {
+                    activeVideoUploadState = null;
+                }
             }
         }
 
@@ -1397,7 +1881,7 @@
             showVideoUploadCancel();
 
             try {
-                await uploadVideoWithProgress('/submission/video-upload', activeUseCaseId, selectedFile, (progress) => {
+                await uploadVideoWithResumableProgress('meeting', activeUseCaseId, selectedFile, (progress) => {
                     updateVideoUploadProgressView(progress);
                     const uploadedMb = formatMegabytes(progress.uploadedBytes || 0);
                     const totalMb = formatMegabytes(progress.totalBytes || 0);
@@ -1406,6 +1890,9 @@
                         'videoMessage',
                         `Uploading ${progress.progressPercent.toFixed(1)}% (${uploadedMb}/${totalMb} MB) • ${speedMbps} MB/s`
                     );
+                }, {
+                    messageTargetId: 'videoMessage',
+                    maxAttempts: MAX_UPLOAD_ATTEMPTS,
                 });
                 updateVideoUploadProgressView({
                     uploadedBytes: selectedFile.size,
@@ -1458,15 +1945,12 @@
             button.textContent = 'Uploading...';
             button.disabled = true;
             document.getElementById('demoVideoSuccess').style.display = 'none';
-
-            const formData = new FormData();
-            formData.append('use_case_id', String(activeUseCaseId));
-            formData.append('video_file', selectedFile);
+            setMessage('demoVideoMessage', 'Uploading demo video...');
 
             try {
-                await apiFetch('/submission/demo-video-upload', {
-                    method: 'POST',
-                    body: formData,
+                await uploadVideoWithResumableProgress('demo', activeUseCaseId, selectedFile, null, {
+                    messageTargetId: 'demoVideoMessage',
+                    maxAttempts: MAX_UPLOAD_ATTEMPTS,
                 });
                 document.getElementById('demoVideoSuccess').style.display = 'flex';
                 setMessage('demoVideoMessage', 'Demo video uploaded successfully (optional).');
@@ -1479,17 +1963,46 @@
         }
 
         function cancelVideoUpload() {
-            if (!activeVideoUploadState || !activeVideoUploadState.xhr) {
+            if (!activeVideoUploadState) {
                 return;
             }
 
             activeVideoUploadState.cancelled = true;
+            activeVideoUploadState.abortReason = 'cancelled';
+            const uploadIdToCancel = activeVideoUploadState.uploadId;
             if (videoUploadCancelBtn) {
                 videoUploadCancelBtn.disabled = true;
                 videoUploadCancelBtn.textContent = 'Cancelling...';
             }
-            activeVideoUploadState.xhr.abort();
+            if (activeVideoUploadState.xhr) {
+                activeVideoUploadState.xhr.abort();
+            }
+            if (activeVideoUploadState.abortController) {
+                activeVideoUploadState.abortController.abort();
+            }
+            if (uploadIdToCancel) {
+                cancelResumableUploadSession(uploadIdToCancel);
+            }
             setMessage('videoMessage', 'Cancelling upload...', true);
+        }
+
+        function handleOfflineDuringUpload() {
+            if (!activeVideoUploadState || activeVideoUploadState.cancelled) {
+                return;
+            }
+
+            activeVideoUploadState.abortReason = 'offline';
+            if (activeVideoUploadState.xhr) {
+                activeVideoUploadState.xhr.abort();
+            }
+            if (activeVideoUploadState.abortController) {
+                activeVideoUploadState.abortController.abort();
+            }
+            setMessage(
+                activeVideoUploadState.messageTargetId || 'videoMessage',
+                'Connection lost. Upload will retry when network is back.',
+                true
+            );
         }
 
         async function handleLogout(event) {
@@ -1510,6 +2023,8 @@
         if (videoUploadCancelBtn) {
             videoUploadCancelBtn.addEventListener('click', cancelVideoUpload);
         }
+
+        window.addEventListener('offline', handleOfflineDuringUpload);
 
         initializeStudentHome();
     </script>

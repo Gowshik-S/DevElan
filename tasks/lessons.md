@@ -14,3 +14,6 @@
 - When users ask for a page to be hosted separately, avoid adding backend route integration or backend-dependent links; keep it a standalone static artifact.
 - If a user specifies light-only mode, remove all dark-mode tokens/toggles and avoid dual-theme scaffolding.
 - API root fallback lists must be environment-aware: never include localhost fallbacks on hosted origins, or users will see misleading production errors and hit unreachable local endpoints.
+- If the user explicitly asks to remove localhost completely, remove all localhost/127 references from frontend source and error paths, not just runtime fallbacks.
+- If a user escalates from roadmap language ("2-4 weeks") to an explicit "implement this" request, switch immediately to an additive production-safe implementation path instead of proposing only guidance.
+- For upload stalls that happen to all users at the same early percentage, always check edge proxy/CDN body-size limits (e.g., Cloudflare) and add adaptive chunk sizing around HTTP 413.

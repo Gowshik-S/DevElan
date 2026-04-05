@@ -225,3 +225,27 @@
 - Highest-confidence near-term path is a phased rollout: immediate retry/idempotency hardening on current API, then custom chunked sessions or tus, then direct-to-object-storage multipart at scale.
 - Core reliability controls identified: per-upload idempotency key, server-tracked upload session with offset/status endpoint, chunk checksum verification, retry with exponential backoff + jitter, and explicit session expiration/garbage collection.
 - Operational risk hotspots to control early: duplicate submission rows/assets, orphaned temp parts, stale session takeover, and integrity mismatches between client-side file metadata and committed object bytes.
+
+## Resumable Upload Implementation Plan (2026-04-05)
+
+- [x] Add backend schemas for resumable upload start/status/chunk/complete responses
+- [x] Implement backend resumable session storage and chunk append service with byte-offset validation
+- [x] Add authenticated submission routes for resumable start, status, chunk upload, complete, and cancel
+- [x] Wire `Frontend/user_home.html` meeting/demo upload flows to chunked resumable API with real last-byte resume
+- [x] Preserve existing upload endpoints for backward compatibility and validate no regression in submission status logic
+- [x] Run focused smoke checks for resumed upload behavior and add implementation review notes
+
+### Resumable Upload Implementation Review (2026-04-05)
+
+- Added resumable session schemas and response contracts for start, status, chunk, and cancel flows.
+- Implemented `app/services/resumable_upload_service.py` with deterministic upload IDs, byte-offset validation, resumable session persistence, and completion finalization into standard upload storage.
+- Added authenticated submission routes:
+	- `POST /api/v1/submission/resumable/start`
+	- `GET /api/v1/submission/resumable/{upload_id}/status`
+	- `PUT /api/v1/submission/resumable/{upload_id}/chunk`
+	- `POST /api/v1/submission/resumable/{upload_id}/complete`
+	- `DELETE /api/v1/submission/resumable/{upload_id}`
+- Kept legacy one-shot upload endpoints unchanged for backward compatibility.
+- Updated `Frontend/user_home.html` meeting/demo upload actions to use chunked resumable API with deterministic upload keys, server-offset reconciliation, per-chunk retries, and cancel/offline abort handling.
+- Tuned chunk strategy for edge proxies (including Cloudflare Tunnel free): default chunk is now 512 KB with adaptive downshift on HTTP 413 response.
+- Verified via OpenAPI route smoke test and end-to-end chunked resume script (`start -> chunk -> start(resume) -> chunk -> complete`) returning success.

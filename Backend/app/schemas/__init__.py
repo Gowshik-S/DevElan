@@ -1,6 +1,10 @@
 from app.schemas.admin import AssignmentSyncResponse, BulkImportResponse, RowFailure, UseCaseImportResponse
 from app.schemas.auth import LoginRequest, LogoutResponse, TokenResponse
 from app.schemas.submission import (
+    ResumableUploadCancelResponse,
+    ResumableUploadChunkResponse,
+    ResumableUploadSessionResponse,
+    ResumableUploadStartRequest,
     RepoLinkSubmissionRequest,
     RepoLinkSubmissionResponse,
     StatusUpdateRequest,
@@ -27,6 +31,10 @@ __all__ = [
     "LogoutResponse",
     "ProfileResponse",
     "ProfileUpdateRequest",
+    "ResumableUploadCancelResponse",
+    "ResumableUploadChunkResponse",
+    "ResumableUploadSessionResponse",
+    "ResumableUploadStartRequest",
     "RepoLinkSubmissionRequest",
     "RepoLinkSubmissionResponse",
     "RowFailure",

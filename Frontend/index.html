@@ -762,11 +762,6 @@
                 : '';
             const explicitApiRoot = String(window.DEVELA_API_ROOT || '').trim();
             const normalizedExplicitApiRoot = explicitApiRoot ? explicitApiRoot.replace(/\/+$/, '') : '';
-            const isLocalOrigin = !origin
-                || origin.startsWith('http://localhost')
-                || origin.startsWith('http://127.0.0.1')
-                || origin.startsWith('https://localhost')
-                || origin.startsWith('https://127.0.0.1');
 
             if (normalizedExplicitApiRoot) {
                 candidates.push(normalizedExplicitApiRoot);
@@ -774,12 +769,6 @@
 
             if (origin) {
                 candidates.push(`${origin}/api/v1`);
-            }
-
-            // Keep localhost fallbacks for local development only.
-            if (isLocalOrigin) {
-                candidates.push('http://127.0.0.1:8000/api/v1');
-                candidates.push('http://localhost:8000/api/v1');
             }
 
             return candidates.filter((value, index, list) => value && list.indexOf(value) === index);

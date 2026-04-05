@@ -1,3 +1,6 @@
+from datetime import datetime
+from typing import Literal
+
 from pydantic import BaseModel, Field, HttpUrl
 
 from app.models.submission import SubmissionStatus
@@ -20,6 +23,40 @@ class VideoUploadResponse(BaseModel):
     video_id: int
     video_type: str | None = None
     status: SubmissionStatus
+    message: str
+
+
+class ResumableUploadStartRequest(BaseModel):
+    use_case_id: str = Field(min_length=1, max_length=50)
+    upload_key: str = Field(min_length=8, max_length=600)
+    file_name: str = Field(min_length=1, max_length=255)
+    file_size_bytes: int = Field(gt=0)
+    upload_kind: Literal["meeting", "demo"] = "meeting"
+    content_type: str | None = Field(default=None, max_length=120)
+    preferred_chunk_size_bytes: int | None = Field(default=None, ge=262144, le=8388608)
+
+
+class ResumableUploadSessionResponse(BaseModel):
+    upload_id: str
+    upload_kind: Literal["meeting", "demo"]
+    file_name: str
+    file_size_bytes: int
+    chunk_size_bytes: int
+    received_bytes: int
+    complete: bool
+    expires_at: datetime
+    message: str
+
+
+class ResumableUploadChunkResponse(BaseModel):
+    upload_id: str
+    received_bytes: int
+    file_size_bytes: int
+    complete: bool
+
+
+class ResumableUploadCancelResponse(BaseModel):
+    success: bool
     message: str
 
 
