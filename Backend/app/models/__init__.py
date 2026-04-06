@@ -2,6 +2,8 @@ from app.models.submission import (
     Submission,
     SubmissionEvaluation,
     SubmissionEvaluationDecision,
+    SubmissionMailNotification,
+    SubmissionMailType,
     SubmissionStatus,
     VideoAsset,
 )
@@ -12,6 +14,8 @@ __all__ = [
     "Submission",
     "SubmissionEvaluation",
     "SubmissionEvaluationDecision",
+    "SubmissionMailNotification",
+    "SubmissionMailType",
     "SubmissionStatus",
     "UseCase",
     "UseCaseAssignment",

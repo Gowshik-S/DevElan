@@ -1,4 +1,5 @@
 from pathlib import Path
+from datetime import UTC, datetime
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
@@ -7,10 +8,19 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.core.dependencies import require_admin
 from app.db.session import get_db
-from app.models.submission import Submission, SubmissionEvaluation, VideoAsset
+from app.models.submission import (
+    Submission,
+    SubmissionEvaluation,
+    SubmissionEvaluationDecision,
+    SubmissionMailNotification,
+    SubmissionMailType,
+    VideoAsset,
+)
 from app.models.usecase import UseCase
 from app.models.user import User
 from app.schemas.submission import (
+    SubmissionEvaluationMailRequest,
+    SubmissionEvaluationMailResponse,
     SubmissionEvaluationUpdateRequest,
     SubmissionEvaluationUpdateResponse,
     StatusUpdateRequest,
@@ -18,6 +28,7 @@ from app.schemas.submission import (
     SubmissionListItem,
     SubmissionListResponse,
 )
+from app.services.mail import send_submission_mail
 
 router = APIRouter(prefix="/submissions", tags=["Submissions"])
 
@@ -54,6 +65,7 @@ def _get_submission_video_assets(db: Session, submission_id: int) -> tuple[Video
 def _build_submission_item(db: Session, submission: Submission) -> SubmissionListItem:
     meeting_asset, demo_asset = _get_submission_video_assets(db, submission.id)
     evaluation = submission.evaluation
+    mail_notification = submission.mail_notification
 
     return SubmissionListItem(
         submission_id=submission.id,
@@ -67,7 +79,91 @@ def _build_submission_item(db: Session, submission: Submission) -> SubmissionLis
         status=submission.status,
         evaluation_decision=evaluation.decision if evaluation else None,
         admin_feedback=evaluation.feedback if evaluation else None,
+        mail_sent_count=mail_notification.sent_count if mail_notification else 0,
+        last_mail_type=mail_notification.last_mail_type if mail_notification else None,
+        last_mail_sent_at=mail_notification.last_sent_at if mail_notification else None,
     )
+
+
+def _build_acceptance_mail_content(
+    submission: Submission,
+    evaluation: SubmissionEvaluation | None,
+) -> tuple[str, str, SubmissionMailType]:
+    student_name = submission.user.full_name or "Student"
+    project_title = submission.usecase.title or "your project"
+    decision = evaluation.decision if evaluation else SubmissionEvaluationDecision.PENDING
+
+    if decision == SubmissionEvaluationDecision.ACCEPTED:
+        subject = "Project Acceptance Notification - DevElan"
+        body = (
+            f"Dear {student_name},\n\n"
+            f"We are pleased to inform you that your project submission titled '{project_title}' has been formally accepted by the evaluation panel.\n"
+            "Your submission has been successfully received and reviewed.\n\n"
+            "Congratulations, and thank you for your effort.\n\n"
+            "Sincerely,\n"
+            "DevElan Evaluation Team"
+        )
+    elif decision == SubmissionEvaluationDecision.REJECTED:
+        subject = "Project Evaluation Result - DevElan"
+        body = (
+            f"Dear {student_name},\n\n"
+            f"Thank you for submitting your project titled '{project_title}'.\n"
+            "After review, your current evaluation status is Rejected.\n"
+            "Please do not be discouraged. Detailed feedback and improvement guidance will be shared by the admin.\n\n"
+            "You may revise and resubmit based on the provided feedback.\n\n"
+            "Sincerely,\n"
+            "DevElan Evaluation Team"
+        )
+    else:
+        subject = "Project Submission Received - DevElan"
+        body = (
+            f"Dear {student_name},\n\n"
+            f"We acknowledge receipt of your project submission titled '{project_title}'.\n"
+            "Your submission is currently under review, and a formal evaluation update will be communicated shortly.\n\n"
+            "Sincerely,\n"
+            "DevElan Evaluation Team"
+        )
+
+    return subject, body, SubmissionMailType.ACCEPTANCE
+
+
+def _build_feedback_mail_content(
+    submission: Submission,
+    evaluation: SubmissionEvaluation | None,
+) -> tuple[str, str, SubmissionMailType]:
+    student_name = submission.user.full_name or "Student"
+    project_title = submission.usecase.title or "your project"
+    decision = evaluation.decision if evaluation else SubmissionEvaluationDecision.PENDING
+    feedback = (evaluation.feedback or "").strip() if evaluation else ""
+
+    if feedback:
+        decision_label = {
+            SubmissionEvaluationDecision.ACCEPTED: "Accepted",
+            SubmissionEvaluationDecision.REJECTED: "Rejected",
+            SubmissionEvaluationDecision.PENDING: "Pending Review",
+        }.get(decision, "Pending Review")
+
+        subject = "Project Feedback - DevElan"
+        body = (
+            f"Hi {student_name},\n\n"
+            f"Project: {project_title}\n"
+            f"Evaluation: {decision_label}\n\n"
+            "Feedback from Admin:\n"
+            f"{feedback}\n\n"
+            "Regards,\n"
+            "DevElan Team"
+        )
+    else:
+        subject = "Project Submission Received - DevElan"
+        body = (
+            f"Hi {student_name},\n\n"
+            f"We have received your project '{project_title}'.\n"
+            "Our team is reviewing your submission.\n\n"
+            "Regards,\n"
+            "DevElan Team"
+        )
+
+    return subject, body, SubmissionMailType.FEEDBACK
 
 
 @router.get("/list", response_model=SubmissionListResponse)
@@ -173,4 +269,80 @@ def update_submission_evaluation(
         evaluation_decision=evaluation.decision,
         admin_feedback=evaluation.feedback,
         message="Evaluation updated successfully.",
+    )
+
+
+@router.post("/send-evaluation-mail", response_model=SubmissionEvaluationMailResponse)
+def send_submission_evaluation_mail(
+    payload: SubmissionEvaluationMailRequest,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+) -> SubmissionEvaluationMailResponse:
+    submission = db.get(Submission, payload.submission_id)
+    if submission is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Submission not found.",
+        )
+
+    recipient_email = submission.user.email.strip() if submission.user.email else ""
+    if not recipient_email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Student email is missing for this submission.",
+        )
+
+    evaluation = submission.evaluation
+    mail_notification = submission.mail_notification
+    if mail_notification is None:
+        mail_notification = SubmissionMailNotification(submission_id=submission.id, sent_count=0)
+
+    sent_count = int(mail_notification.sent_count or 0)
+    if sent_count > 0 and not payload.send_anyway:
+        return SubmissionEvaluationMailResponse(
+            success=False,
+            submission_id=submission.id,
+            needs_confirmation=True,
+            mail_type=mail_notification.last_mail_type,
+            mail_sent_count=sent_count,
+            last_mail_sent_at=mail_notification.last_sent_at,
+            message="Mail already sent once. Send anyway?",
+        )
+
+    if sent_count == 0:
+        subject, body, mail_type = _build_acceptance_mail_content(submission, evaluation)
+    else:
+        subject, body, mail_type = _build_feedback_mail_content(submission, evaluation)
+
+    mail_result = send_submission_mail(
+        recipient_email=recipient_email,
+        subject=subject,
+        body_text=body,
+    )
+    if not mail_result.success:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=mail_result.message,
+        )
+
+    now = datetime.now(UTC)
+    if sent_count == 0 and mail_notification.first_sent_at is None:
+        mail_notification.first_sent_at = now
+    mail_notification.sent_count = sent_count + 1
+    mail_notification.last_mail_type = mail_type
+    mail_notification.last_sent_at = now
+
+    db.add(mail_notification)
+    db.commit()
+    db.refresh(mail_notification)
+
+    message = "Acceptance mail sent successfully." if mail_type == SubmissionMailType.ACCEPTANCE else "Feedback mail sent successfully."
+    return SubmissionEvaluationMailResponse(
+        success=True,
+        submission_id=submission.id,
+        needs_confirmation=False,
+        mail_type=mail_type,
+        mail_sent_count=mail_notification.sent_count,
+        last_mail_sent_at=mail_notification.last_sent_at,
+        message=message,
     )

@@ -3,7 +3,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, HttpUrl
 
-from app.models.submission import SubmissionEvaluationDecision, SubmissionStatus
+from app.models.submission import SubmissionEvaluationDecision, SubmissionMailType, SubmissionStatus
 
 
 class RepoLinkSubmissionRequest(BaseModel):
@@ -72,6 +72,9 @@ class SubmissionDetail(BaseModel):
     status: SubmissionStatus
     evaluation_decision: SubmissionEvaluationDecision | None = None
     admin_feedback: str | None = None
+    mail_sent_count: int = 0
+    last_mail_type: SubmissionMailType | None = None
+    last_mail_sent_at: datetime | None = None
 
 
 class SubmissionListItem(BaseModel):
@@ -86,6 +89,9 @@ class SubmissionListItem(BaseModel):
     status: SubmissionStatus
     evaluation_decision: SubmissionEvaluationDecision | None = None
     admin_feedback: str | None = None
+    mail_sent_count: int = 0
+    last_mail_type: SubmissionMailType | None = None
+    last_mail_sent_at: datetime | None = None
 
 
 class SubmissionListResponse(BaseModel):
@@ -117,4 +123,19 @@ class SubmissionEvaluationUpdateResponse(BaseModel):
     submission_id: int
     evaluation_decision: SubmissionEvaluationDecision
     admin_feedback: str | None = None
+    message: str
+
+
+class SubmissionEvaluationMailRequest(BaseModel):
+    submission_id: int
+    send_anyway: bool = False
+
+
+class SubmissionEvaluationMailResponse(BaseModel):
+    success: bool
+    submission_id: int
+    needs_confirmation: bool = False
+    mail_type: SubmissionMailType | None = None
+    mail_sent_count: int = 0
+    last_mail_sent_at: datetime | None = None
     message: str

@@ -331,3 +331,48 @@
 - Added client-side sort helpers for name/register options and wired immediate re-render on sort changes.
 - Updated repository link rendering to a compact `Open Repo` chip with `target="_blank"` and `rel="noopener noreferrer"`.
 - Verified render markers confirm sort controls, sort functions, compact repo-link class, and new-tab behavior.
+
+## Submission Evaluation Mail Workflow Plan (2026-04-06)
+
+- [x] Convert mail service into reusable Graph API helper wired to backend settings
+- [x] Add backend mail-state persistence and API endpoint for evaluation mail sending
+- [x] Implement first-send acceptance mail and repeat-send feedback mail with send-anyway confirmation flow
+- [x] Add row-level send-mail button in admin submissions evaluation cell
+- [x] Validate route + UI behavior with focused smoke checks and add review notes
+
+### Submission Evaluation Mail Workflow Review (2026-04-06)
+
+- Replaced the ad-hoc `mail.py` script with a reusable `send_submission_mail()` helper using Microsoft Graph app credentials from settings.
+- Added new mail state persistence table (`submission_mail_notifications`) to track send count and mail type without altering existing evaluation table columns.
+- Added `POST /api/v1/submissions/send-evaluation-mail`:
+	- First send (`mail_sent_count == 0`) sends acceptance-style mail.
+	- Repeat send without `send_anyway` returns `needs_confirmation=true` and message `Mail already sent once. Send anyway?`.
+	- Repeat send with `send_anyway=true` sends feedback-style mail (or generic received message if feedback is empty).
+- Updated submissions list payload with `mail_sent_count` and `last_mail_type`.
+- Added a row-level `Send Acceptance Mail / Send Feedback Mail` button in admin submissions evaluation cell and wired confirmation flow in UI.
+- Send-mail action now auto-saves current decision and feedback before dispatch, so mail content uses latest edits even if `Save` was not clicked separately.
+- Verified with smoke checks:
+	- Endpoint registration marker present in OpenAPI.
+	- End-to-end sequence: first send success -> second send confirmation required -> forced resend success.
+	- List payload reflects incremented `mail_sent_count`.
+	- `/submissions` render includes mail button and API wiring markers.
+
+## Polished Mail Templates + History Tooltip (2026-04-06)
+
+- [x] Add formal, separate accepted/rejected first-mail templates
+- [x] Expose last mail sent timestamp in submissions API payloads
+- [x] Add row-level mail history tooltip showing last sent type and timestamp
+- [x] Keep tooltip state synced after each send action
+- [x] Validate template selection and tooltip markers with smoke checks
+
+### Polished Mail Templates + History Tooltip Review (2026-04-06)
+
+- Upgraded first-send templates in backend to formal accepted/rejected variants with professional wording.
+- Added `last_mail_sent_at` to submission list/detail and send-mail response schemas.
+- Updated submissions route item builder and send-mail endpoint responses to include `last_mail_sent_at`.
+- Added `Mail History` tooltip chip per row in admin submissions page with title content:
+	- Mail Sent Count
+	- Last Mail Type
+	- Last Sent Time
+- Tooltip content now updates after each successful send using returned response fields.
+- Verified via mocked mail smoke tests that accepted and rejected first-send templates are selected correctly and that `last_mail_sent_at` is populated.

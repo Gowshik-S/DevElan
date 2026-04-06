@@ -1,7 +1,7 @@
 import enum
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum as SqlEnum, ForeignKey, String, Text, UniqueConstraint, func
+from sqlalchemy import DateTime, Enum as SqlEnum, ForeignKey, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -19,6 +19,11 @@ class SubmissionEvaluationDecision(str, enum.Enum):
     PENDING = "pending"
     ACCEPTED = "accepted"
     REJECTED = "rejected"
+
+
+class SubmissionMailType(str, enum.Enum):
+    ACCEPTANCE = "acceptance"
+    FEEDBACK = "feedback"
 
 
 class Submission(Base):
@@ -53,6 +58,12 @@ class Submission(Base):
     video_assets = relationship("VideoAsset", back_populates="submission", cascade="all, delete-orphan")
     evaluation = relationship(
         "SubmissionEvaluation",
+        back_populates="submission",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
+    mail_notification = relationship(
+        "SubmissionMailNotification",
         back_populates="submission",
         uselist=False,
         cascade="all, delete-orphan",
@@ -105,3 +116,24 @@ class SubmissionEvaluation(Base):
     )
 
     submission = relationship("Submission", back_populates="evaluation")
+
+
+class SubmissionMailNotification(Base):
+    __tablename__ = "submission_mail_notifications"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    submission_id: Mapped[int] = mapped_column(
+        ForeignKey("submissions.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+        index=True,
+    )
+    sent_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    last_mail_type: Mapped[SubmissionMailType | None] = mapped_column(
+        SqlEnum(SubmissionMailType, name="submission_mail_type_enum"),
+        nullable=True,
+    )
+    first_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    submission = relationship("Submission", back_populates="mail_notification")

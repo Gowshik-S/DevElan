@@ -22,3 +22,5 @@
 - When meeting and demo uploads share backend mechanics, keep telemetry UX parity (progress %, speed, ETA) across both to avoid feature drift.
 - Keep evaluator metadata separate from upload/progress status: store admin decision (`accepted/rejected`) and feedback in a dedicated evaluation record so student submission lifecycle states remain stable.
 - For admin dashboards with many columns, avoid fixed-width-only grids; add a horizontal scroll wrapper and responsive header/nav wrapping to preserve alignment on laptop and mobile widths.
+- For admin-triggered notifications, persist per-submission send state and require explicit confirmation on repeats to prevent accidental duplicate emails.
+- When admins trigger outgoing mails from table rows, include a lightweight history tooltip (count/type/time) and refresh it immediately after send to keep operator context visible.

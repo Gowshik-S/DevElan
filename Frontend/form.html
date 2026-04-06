@@ -342,9 +342,44 @@
             background: var(--primary-night-blue);
         }
 
+        .btn-eval-mail {
+            justify-self: start;
+            border: 1px solid rgba(30, 58, 138, 0.25);
+            border-radius: 8px;
+            background: rgba(30, 58, 138, 0.07);
+            color: var(--primary-night-blue);
+            font-size: 0.72rem;
+            font-weight: 800;
+            padding: 0.38rem 0.7rem;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .btn-eval-mail:hover:not(:disabled) {
+            background: rgba(30, 58, 138, 0.14);
+        }
+
         .btn-eval-save:disabled {
             opacity: 0.7;
             cursor: wait;
+        }
+
+        .btn-eval-mail:disabled {
+            opacity: 0.7;
+            cursor: wait;
+        }
+
+        .mail-history-chip {
+            justify-self: start;
+            border: 1px dashed rgba(84, 104, 119, 0.45);
+            border-radius: 8px;
+            background: rgba(84, 104, 119, 0.08);
+            color: var(--muted-blue);
+            font-size: 0.66rem;
+            font-weight: 800;
+            padding: 0.32rem 0.62rem;
+            cursor: help;
+            user-select: none;
         }
 
         .eval-message {
@@ -570,6 +605,22 @@
 
         [data-theme="dark"] .btn-eval-save:hover:not(:disabled) {
             background: #26aea1;
+        }
+
+        [data-theme="dark"] .btn-eval-mail {
+            border-color: rgba(46, 196, 182, 0.4);
+            background: rgba(46, 196, 182, 0.15);
+            color: var(--dark-accent);
+        }
+
+        [data-theme="dark"] .btn-eval-mail:hover:not(:disabled) {
+            background: rgba(46, 196, 182, 0.24);
+        }
+
+        [data-theme="dark"] .mail-history-chip {
+            border-color: rgba(183, 194, 187, 0.4);
+            background: rgba(183, 194, 187, 0.15);
+            color: var(--dark-muted);
         }
 
         [data-theme="dark"] .eval-message {
@@ -908,6 +959,42 @@
             return 'pending';
         }
 
+        function formatMailTypeLabel(rawType) {
+            const normalized = String(rawType || '').trim().toLowerCase();
+            if (!normalized) {
+                return 'Not sent yet';
+            }
+            return normalized.replace(/[_-]/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+        }
+
+        function formatMailTimestamp(rawTimestamp) {
+            if (!rawTimestamp) {
+                return 'Not sent yet';
+            }
+
+            const parsed = new Date(rawTimestamp);
+            if (Number.isNaN(parsed.getTime())) {
+                return String(rawTimestamp);
+            }
+
+            return parsed.toLocaleString(undefined, {
+                year: 'numeric',
+                month: 'short',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+            });
+        }
+
+        function buildMailHistoryTooltip(item) {
+            const sentCount = Number(item?.mail_sent_count || 0);
+            return [
+                `Mail Sent Count: ${sentCount}`,
+                `Last Mail Type: ${formatMailTypeLabel(item?.last_mail_type)}`,
+                `Last Sent Time: ${formatMailTimestamp(item?.last_mail_sent_at)}`,
+            ].join('\n');
+        }
+
         function sortSubmissions(items, sortMode) {
             const list = Array.isArray(items) ? [...items] : [];
             if (sortMode === 'name_asc') {
@@ -1019,6 +1106,27 @@
                 saveButton.type = 'button';
                 saveButton.textContent = 'Save';
 
+                const sendMailButton = document.createElement('button');
+                sendMailButton.className = 'btn-eval-mail';
+                sendMailButton.type = 'button';
+
+                const historyChip = document.createElement('span');
+                historyChip.className = 'mail-history-chip';
+
+                function refreshMailHistoryTooltip() {
+                    const sentCount = Number(item.mail_sent_count || 0);
+                    historyChip.textContent = sentCount > 0 ? `Mail History (${sentCount})` : 'Mail History';
+                    historyChip.title = buildMailHistoryTooltip(item);
+                }
+
+                function refreshSendMailLabel() {
+                    const sentCount = Number(item.mail_sent_count || 0);
+                    sendMailButton.textContent = sentCount > 0 ? 'Send Feedback Mail' : 'Send Acceptance Mail';
+                }
+
+                refreshSendMailLabel();
+                refreshMailHistoryTooltip();
+
                 const evaluationMessage = document.createElement('p');
                 evaluationMessage.className = 'eval-message';
 
@@ -1059,9 +1167,78 @@
                     }
                 });
 
+                sendMailButton.addEventListener('click', async () => {
+                    const selectedDecision = normalizeEvaluationDecision(decisionSelect.value);
+                    const feedbackText = feedbackInput.value.trim();
+
+                    sendMailButton.disabled = true;
+                    sendMailButton.textContent = 'Sending...';
+                    evaluationMessage.textContent = '';
+                    evaluationMessage.classList.remove('success', 'error');
+
+                    async function sendMail(sendAnyway = false) {
+                        return apiFetch('/submissions/send-evaluation-mail', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                submission_id: item.submission_id,
+                                send_anyway: sendAnyway,
+                            }),
+                        });
+                    }
+
+                    try {
+                        const saveResult = await apiFetch('/submissions/update-evaluation', {
+                            method: 'PATCH',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                submission_id: item.submission_id,
+                                evaluation_decision: selectedDecision,
+                                admin_feedback: feedbackText || null,
+                            }),
+                        });
+
+                        item.evaluation_decision = saveResult.evaluation_decision;
+                        item.admin_feedback = saveResult.admin_feedback;
+                        decisionSelect.value = normalizeEvaluationDecision(saveResult.evaluation_decision);
+                        feedbackInput.value = saveResult.admin_feedback || '';
+
+                        let mailResult = await sendMail(false);
+
+                        if (mailResult.needs_confirmation) {
+                            const shouldForceSend = window.confirm(mailResult.message || 'Mail already sent once. Send anyway?');
+                            if (!shouldForceSend) {
+                                evaluationMessage.textContent = 'Mail send cancelled.';
+                                evaluationMessage.classList.add('error');
+                                return;
+                            }
+                            mailResult = await sendMail(true);
+                        }
+
+                        item.mail_sent_count = Number(mailResult.mail_sent_count || 0);
+                        item.last_mail_type = mailResult.mail_type || null;
+                        item.last_mail_sent_at = mailResult.last_mail_sent_at || item.last_mail_sent_at || null;
+                        evaluationMessage.textContent = mailResult.message || 'Mail sent successfully.';
+                        evaluationMessage.classList.add('success');
+                    } catch (error) {
+                        evaluationMessage.textContent = error.message || 'Failed to send mail.';
+                        evaluationMessage.classList.add('error');
+                    } finally {
+                        sendMailButton.disabled = false;
+                        refreshSendMailLabel();
+                        refreshMailHistoryTooltip();
+                    }
+                });
+
                 evaluationCell.appendChild(decisionSelect);
                 evaluationCell.appendChild(feedbackInput);
                 evaluationCell.appendChild(saveButton);
+                evaluationCell.appendChild(sendMailButton);
+                evaluationCell.appendChild(historyChip);
                 evaluationCell.appendChild(evaluationMessage);
 
                 row.appendChild(userCell);

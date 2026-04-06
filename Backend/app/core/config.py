@@ -26,6 +26,12 @@ class Settings(BaseSettings):
     upload_dir: str = Field(default="uploads", alias="UPLOAD_DIR")
     max_upload_size_mb: int = Field(default=200, alias="MAX_UPLOAD_SIZE_MB")
 
+    mail_client_id: str | None = Field(default=None, alias="CLIENT_ID")
+    mail_client_secret: str | None = Field(default=None, alias="CLIENT_SECRET")
+    mail_tenant_id: str | None = Field(default=None, alias="TENANT_ID")
+    mail_sender_user: str = Field(default="DevElan@ettalabs.in", alias="MAIL_SENDER_USER")
+    mail_request_timeout_seconds: int = Field(default=20, alias="MAIL_REQUEST_TIMEOUT_SECONDS")
+
 
 @lru_cache
 def get_settings() -> Settings:
