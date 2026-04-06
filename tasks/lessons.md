@@ -24,3 +24,4 @@
 - For admin dashboards with many columns, avoid fixed-width-only grids; add a horizontal scroll wrapper and responsive header/nav wrapping to preserve alignment on laptop and mobile widths.
 - For admin-triggered notifications, persist per-submission send state and require explicit confirmation on repeats to prevent accidental duplicate emails.
 - When admins trigger outgoing mails from table rows, include a lightweight history tooltip (count/type/time) and refresh it immediately after send to keep operator context visible.
+- Never rely on cwd-relative `.env` loading for deployed services; resolve env paths relative to backend source root to avoid missing credentials and intermittent 502 mail failures.

@@ -376,3 +376,17 @@
 	- Last Sent Time
 - Tooltip content now updates after each successful send using returned response fields.
 - Verified via mocked mail smoke tests that accepted and rejected first-send templates are selected correctly and that `last_mail_sent_at` is populated.
+
+## Submission Mail 502 Mitigation (2026-04-06)
+
+- [x] Make backend `.env` loading independent of process working directory
+- [x] Normalize mail credential keys in `.env` to parser-safe format
+- [x] Add explicit server logging for send-mail failures (reason + submission id)
+- [x] Re-validate live send route behavior after config hardening
+
+### Submission Mail 502 Mitigation Review (2026-04-06)
+
+- Updated settings to load env file from absolute backend path (`Backend/.env`) so production service cwd differences do not drop mail credentials.
+- Normalized `.env` mail credential entries (`CLIENT_ID`, `CLIENT_SECRET`, `TENANT_ID`, `MAIL_SENDER_USER`) to no-space key syntax.
+- Added structured error logging in send-mail route to expose exact 502 cause in server logs.
+- Verified send route still succeeds locally and returns structured success payload including `last_mail_sent_at`.

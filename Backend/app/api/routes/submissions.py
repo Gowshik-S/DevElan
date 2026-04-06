@@ -1,5 +1,6 @@
 from pathlib import Path
 from datetime import UTC, datetime
+import logging
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
@@ -31,6 +32,7 @@ from app.schemas.submission import (
 from app.services.mail import send_submission_mail
 
 router = APIRouter(prefix="/submissions", tags=["Submissions"])
+logger = logging.getLogger(__name__)
 
 
 DEMO_VIDEO_PREFIX = "demo_"
@@ -320,6 +322,12 @@ def send_submission_evaluation_mail(
         body_text=body,
     )
     if not mail_result.success:
+        logger.error(
+            "Failed to send submission evaluation mail: submission_id=%s recipient=%s reason=%s",
+            submission.id,
+            recipient_email,
+            mail_result.message,
+        )
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=mail_result.message,
